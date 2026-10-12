@@ -68,7 +68,7 @@ class AuthController extends Notifier<AuthState> {
       final ApiToken token =
           await ref.read(authRepositoryProvider).login(credentials);
       // Repartir de zéro : aucune trace d'une session précédente.
-      await _purge();
+      await _purge(signedIn: true);
       final SecureStorageService storage = ref.read(secureStorageServiceProvider);
       await storage.saveCredentials(credentials);
       await storage.saveApiToken(token);
@@ -84,7 +84,7 @@ class AuthController extends Notifier<AuthState> {
 
   /// Déconnexion (volontaire ou identifiants refusés).
   Future<void> signOut({String? message}) async {
-    await _purge();
+    await _purge(signedIn: false);
     // Le message du serveur n'est pas journalisé (il peut citer l'e-mail).
     AppLog.auth(message == null ? 'déconnexion' : 'déconnexion (session perdue)');
     state = AuthSignedOut(message: message);
@@ -92,14 +92,15 @@ class AuthController extends Notifier<AuthState> {
 
   /// Repart de zéro : rien d'une session précédente ne subsiste.
   ///  * session en mémoire et cookies oubliés : les opérations en cours ne
-  ///    pourront plus rien enregistrer ;
+  ///    pourront plus rien enregistrer (ni session, ni cache) et, après une
+  ///    déconnexion, aucune reconnexion n'est tentée ;
   ///  * coffre vidé : identifiants, jeton API, session école (cookies,
   ///    segment, pkEntite) ;
   ///  * cache Hive vidé : planning et notes.
   /// Les écrans de données, détruits avec l'écran principal, annulent leurs
   /// requêtes en cours.
-  Future<void> _purge() async {
-    ref.read(sessionManagerProvider).reset();
+  Future<void> _purge({required bool signedIn}) async {
+    ref.read(sessionManagerProvider).reset(signedIn: signedIn);
     await ref.read(secureStorageServiceProvider).clearAll();
     await ref.read(cacheStoreProvider).clear();
   }

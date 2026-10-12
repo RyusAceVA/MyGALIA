@@ -80,6 +80,61 @@ void main() {
     expect(env.server.edcEntryCalls, entriesBefore + 1);
   });
 
+  test('déconnexion pendant un chargement : ni reconnexion, ni message parasite, ni cache', () async {
+    expect(await auth.signIn(env.server.email, env.server.password), isNull);
+    env.server
+      ..planningDelay = const Duration(milliseconds: 150)
+      ..planningDelayCount = 5;
+    final Future<Object?> load = env.container
+        .read(scheduleRepositoryProvider)
+        .fetchWeek(monday)
+        .then<Object?>((Object? v) => v, onError: (Object e) => e);
+    await Future<void>.delayed(const Duration(milliseconds: 60)); // lundi en cours
+    final int logins = env.server.loginCalls;
+    final int getTokens = env.server.getTokenCalls;
+
+    await auth.signOut();
+    expect(await load, isA<CancelledFailure>());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(env.server.loginCalls, logins, reason: 'aucune reconnexion après déconnexion');
+    expect(env.server.getTokenCalls, getTokens);
+    final AuthState state = env.container.read(authControllerProvider);
+    expect(state, isA<AuthSignedOut>());
+    expect((state as AuthSignedOut).message, isNull, reason: 'pas de message parasite');
+    expect(box.isEmpty, isTrue, reason: 'aucune donnée écrite après la purge');
+    expect(env.store.values, isEmpty);
+  });
+
+  test('reconnexion en cours pendant déconnexion puis connexion : rien de l\'ancienne', () async {
+    await signInAndLoad();
+    env.server
+      ..expireApiTokens()
+      ..expireSchoolSession()
+      ..getTokenDelay = const Duration(milliseconds: 200);
+    final Future<Object?> pending = env.container
+        .read(scheduleRepositoryProvider)
+        .fetchWeek(monday)
+        .then<Object?>((Object? v) => v, onError: (Object e) => e);
+    await Future<void>.delayed(const Duration(milliseconds: 60)); // GetToken en attente
+
+    await auth.signOut();
+    env.server.getTokenDelay = Duration.zero;
+    expect(await auth.signIn(env.server.email, env.server.password), isNull);
+    final String? newToken = (await env.vault.readApiToken())?.value;
+    final int logins = env.server.loginCalls;
+
+    expect(await pending, isA<CancelledFailure>());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(env.server.loginCalls, logins, reason: 'pas de connexion avec l\'ancien mot de passe');
+    expect(
+      (await env.vault.readApiToken())?.value,
+      newToken,
+      reason: 'le jeton de la nouvelle session n\'est pas effacé',
+    );
+  });
+
   test('identifiants refusés en arrière-plan : retour à la connexion avec message', () async {
     await signInAndLoad();
     env.server

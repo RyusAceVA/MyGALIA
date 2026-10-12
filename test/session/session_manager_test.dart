@@ -170,7 +170,7 @@ void main() {
     final Future<String> pending = env.school.run('test', _planningPage);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    env.sessions.reset();
+    env.sessions.reset(signedIn: false);
     await env.vault.clearAll();
 
     await expectLater(pending, throwsA(isA<Failure>()));

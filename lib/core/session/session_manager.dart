@@ -56,9 +56,17 @@ class SessionManager {
   int _epoch = 0;
   int _renewals = 0;
 
+  /// Vrai après une déconnexion : aucune reconnexion jusqu'à la prochaine
+  /// connexion (les chargements encore en vol sont simplement annulés).
+  bool _signedOut = false;
+
   /// Émet quand l'utilisateur doit se reconnecter (identifiants refusés ou
   /// absents du coffre).
   Stream<Failure> get sessionLost => _sessionLost.stream;
+
+  /// Change à chaque déconnexion ou connexion : un chargement qui le voit
+  /// changer ne doit plus rien écrire (cache compris).
+  int get epoch => _epoch;
 
   /// Nombre de reconnexions effectuées (tests, diagnostic).
   @visibleForTesting
@@ -66,6 +74,7 @@ class SessionManager {
 
   /// Session école utilisable : mémoire, sinon coffre, sinon reconnexion.
   Future<EdcSession> current() async {
+    if (_signedOut) throw const CancelledFailure();
     await (_restoring ??= _restore());
     final EdcSession? session = _session;
     if (session != null) return session;
@@ -78,6 +87,9 @@ class SessionManager {
   /// renouveler), elle est rendue sans nouvelle reconnexion. Si une
   /// reconnexion est en cours, son résultat est partagé.
   Future<EdcSession> renew({int? staleGeneration}) {
+    if (_signedOut) {
+      return Future<EdcSession>.error(const CancelledFailure());
+    }
     final EdcSession? session = _session;
     if (session != null &&
         staleGeneration != null &&
@@ -105,15 +117,18 @@ class SessionManager {
     await _persist(session);
   }
 
-  /// Oublie tout (déconnexion, nouvelle connexion). Les opérations en cours
-  /// ne pourront plus enregistrer leur résultat.
-  void reset() {
+  /// Oublie tout : les opérations en cours ne pourront plus rien enregistrer.
+  ///  * [signedIn] faux (déconnexion) : plus aucune reconnexion jusqu'à la
+  ///    prochaine connexion ; les chargements encore en vol sont annulés ;
+  ///  * [signedIn] vrai (nouvelle connexion) : on repart de zéro.
+  void reset({required bool signedIn}) {
     _epoch++;
+    _signedOut = !signedIn;
     _session = null;
     _apiToken = null;
     _renewal = null;
     _restoring = null;
-    AppLog.session('session réinitialisée');
+    AppLog.session(signedIn ? 'session réinitialisée (connexion)' : 'session fermée (déconnexion)');
   }
 
   void dispose() {
@@ -209,8 +224,14 @@ class SessionManager {
     _session = null;
     await _storage.deleteEdcSession();
 
+    // L'époque est revérifiée avant chaque étape réseau ou stockage : une
+    // reconnexion qui chevauche une déconnexion (puis éventuellement une
+    // nouvelle connexion) s'arrête net, sans toucher aux données de la
+    // nouvelle session ni envoyer l'ancien mot de passe.
     try {
+      _ensureEpoch(epoch);
       final Credentials? credentials = await _storage.readCredentials();
+      _ensureEpoch(epoch);
       if (credentials == null) throw const SignedOutFailure();
 
       ApiToken token = await _usableApiToken(credentials, epoch);
@@ -221,6 +242,7 @@ class SessionManager {
           () => _handshake(credentials, token, generation),
         );
       } on ApiTokenRejected catch (rejected) {
+        _ensureEpoch(epoch);
         AppLog.session(
           'jeton API refusé (HTTP ${rejected.status}) : nouvelle connexion API',
         );
@@ -272,6 +294,7 @@ class SessionManager {
 
   Future<ApiToken> _usableApiToken(Credentials credentials, int epoch) async {
     final ApiToken? token = _apiToken ?? await _storage.readApiToken();
+    _ensureEpoch(epoch);
     if (token != null && token.isUsable(_clock())) {
       _apiToken = token;
       return token;
@@ -283,6 +306,8 @@ class SessionManager {
   }
 
   Future<ApiToken> _loginAndStore(Credentials credentials, int epoch) async {
+    // Jamais de connexion avec les identifiants d'une session close.
+    _ensureEpoch(epoch);
     final ApiToken token = await _auth.login(credentials);
     _ensureEpoch(epoch);
     _apiToken = token;
