@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/debug/app_log.dart';
+import 'package:mygalia/core/lifecycle/refresh_signals.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/storage/cache_store.dart';
@@ -20,10 +23,14 @@ import 'package:mygalia/core/storage/cache_store.dart';
 ///    d'une requête lancée avant n'est jamais publié après.
 ///  * À la destruction (écran fermé, semaine quittée, déconnexion), la
 ///    requête en cours est annulée.
+///  * Rechargement automatique au retour du réseau ou au premier plan,
+///    seulement si le dernier essai a échoué ou si les données sont
+///    anciennes, et jamais en rafale.
 mixin DataLoader<T, A> on AutoDisposeFamilyNotifier<DataState<T>, A> {
   int _epoch = 0;
   CancelToken? _cancelToken;
   Future<void>? _inFlight;
+  DateTime? _lastAutoRefresh;
 
   /// Nom lisible pour les journaux de diagnostic.
   String get label;
@@ -49,6 +56,11 @@ mixin DataLoader<T, A> on AutoDisposeFamilyNotifier<DataState<T>, A> {
       _inFlight = null;
       token.cancel('écran fermé');
     });
+    final StreamSubscription<RefreshReason> signals = ref
+        .read(refreshSignalsProvider)
+        .stream
+        .listen((RefreshReason reason) => _onSignal(epoch, reason));
+    ref.onDispose(signals.cancel);
 
     final CachedValue<T>? cached = readCache();
     final bool fetchNow = cached == null ||
@@ -76,6 +88,28 @@ mixin DataLoader<T, A> on AutoDisposeFamilyNotifier<DataState<T>, A> {
     final CancelToken? token = _cancelToken;
     if (token == null || token.isCancelled) return Future<void>.value();
     return _start(_epoch, token, 'manuel');
+  }
+
+  /// Signal de rechargement automatique : utile seulement si le dernier
+  /// essai a échoué ou si les données sont anciennes.
+  void _onSignal(int epoch, RefreshReason reason) {
+    if (epoch != _epoch || _inFlight != null) return;
+    final DataState<T> current = state;
+    final DateTime? updatedAt = current.updatedAt;
+    final bool failed = current.failure != null;
+    final bool stale = updatedAt == null ||
+        now().difference(updatedAt) > AppConstants.autoRefreshAfter;
+    if (!failed && !stale) return;
+    final DateTime at = now();
+    final DateTime? last = _lastAutoRefresh;
+    if (last != null && at.difference(last) < AppConstants.minAutoRefreshInterval) {
+      AppLog.lifecycle('$label : rechargement auto ignoré (anti-rafale)');
+      return;
+    }
+    final CancelToken? token = _cancelToken;
+    if (token == null || token.isCancelled) return;
+    _lastAutoRefresh = at;
+    _start(epoch, token, reason.label);
   }
 
   Future<void> _start(int epoch, CancelToken token, String reason) {

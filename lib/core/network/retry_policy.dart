@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/debug/app_log.dart';
+import 'package:mygalia/core/lifecycle/network_status.dart';
 import 'package:mygalia/core/network/failure.dart';
 
 /// Relance automatique des erreurs TRANSITOIRES (timeout, 5xx, coupure).
@@ -36,10 +37,11 @@ class RetryPolicy {
       try {
         return await action();
       } on Failure catch (failure) {
+        // Annulé entre-temps : c'est une annulation, pas une erreur à afficher.
+        if (cancelToken?.isCancelled ?? false) throw const CancelledFailure();
         final bool canRetry = failure.isTransient &&
             attempt < delays.length &&
-            !(isOffline?.call() ?? false) &&
-            !(cancelToken?.isCancelled ?? false);
+            !(isOffline?.call() ?? false);
         if (!canRetry) rethrow;
         final Duration delay = delays[attempt];
         AppLog.retry(
@@ -55,7 +57,8 @@ class RetryPolicy {
   }
 }
 
-/// Politique de relance de l'app (délais nuls dans les tests).
+/// Politique de relance de l'app (délais nuls dans les tests). Hors ligne,
+/// aucune relance : le rechargement se fera au retour du réseau.
 final retryPolicyProvider = Provider<RetryPolicy>((ref) {
-  return const RetryPolicy();
+  return RetryPolicy(isOffline: () => !ref.read(networkOnlineProvider));
 });

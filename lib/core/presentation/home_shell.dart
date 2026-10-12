@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:mygalia/core/lifecycle/app_lifecycle_watcher.dart';
 import 'package:mygalia/features/grades/presentation/grades_screen.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_screen.dart';
 
@@ -21,6 +22,13 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Retour du réseau / au premier plan : signaux de rechargement.
+    return AppLifecycleWatcher(
+      child: _buildShell(),
+    );
+  }
+
+  Widget _buildShell() {
     return Scaffold(
       body: IndexedStack(
         index: _index,
