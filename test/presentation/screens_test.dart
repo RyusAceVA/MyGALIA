@@ -183,10 +183,16 @@ void main() {
       ),
     ]);
 
-    expect(find.text('Sensibilisation ITIL'), findsOneWidget);
-    expect(find.textContaining('12,5'), findsOneWidget);
+    expect(find.text('MOYENNE GÉNÉRALE'), findsOneWidget);
+    expect(find.text('Meilleure'), findsOneWidget);
+    expect(find.text('Plus basse'), findsOneWidget);
+    expect(find.text('Toutes les notes'), findsOneWidget);
+    expect(find.text('Sensibilisation ITIL'), findsWidgets);
+    expect(find.textContaining('12,5'), findsWidgets);
     expect(find.text('coef. 1'), findsOneWidget);
-    expect(find.text('Semestre'), findsWidgets);
+    expect(find.text('19 septembre 2025'), findsOneWidget);
+    expect(find.text('SEMESTRE 2'), findsOneWidget);
+    expect(find.text('SEMESTRE 1'), findsOneWidget);
   });
 
   testWidgets('notes : le sélecteur reste visible pendant le changement de semestre', (tester) async {
@@ -205,17 +211,17 @@ void main() {
         }),
       ),
     ]);
-    expect(find.text('SEMESTRE 1 (2024-2025)'), findsWidgets);
+    expect(find.text('Aucune note pour ce semestre.'), findsOneWidget);
 
-    await tester.tap(find.byType(DropdownMenu<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('SEMESTRE 2 (du 29/09/2025 au 11/09/2026)').last);
+    await tester.tap(find.text('SEMESTRE 2'));
     await tester.pump();
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.byType(DropdownMenu<String>), findsOneWidget);
-    expect(find.text('SEMESTRE 2 (2025-2026)'), findsWidgets);
+    expect(find.byType(SegmentedButton<String>), findsOneWidget);
+    final SegmentedButton<String> selector =
+        tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
+    expect(selector.selected, {'31'});
   });
 
   test('formatNumber : virgule décimale française', () {

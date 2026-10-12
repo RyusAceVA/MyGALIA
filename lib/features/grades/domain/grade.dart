@@ -21,6 +21,9 @@ class Grade {
   /// Nature de l'évaluation (« Devoir surveillé », « Oral »…).
   final String? type;
 
+  /// Note ramenée sur 20.
+  double get on20 => outOf == 0 ? 0 : value / outOf * 20;
+
   Map<String, Object?> toJson() => {
         'value': value,
         'outOf': outOf,
@@ -65,6 +68,14 @@ class SchoolPeriod {
     return m == null ? label : '${m.group(1)} (${m.group(2)}-${m.group(3)})';
   }
 
+  static final RegExp _parenthesis = RegExp(r'\s*\(.*\)\s*$');
+
+  /// Nom seul, pour un segment : « SEMESTRE 1 ».
+  String get name {
+    final String stripped = label.replaceFirst(_parenthesis, '');
+    return stripped.isEmpty ? label : stripped;
+  }
+
   Map<String, Object?> toJson() => {'value': value, 'label': label};
 
   static SchoolPeriod fromJson(Map<String, Object?> json) => SchoolPeriod(
@@ -78,6 +89,54 @@ class SchoolPeriod {
 
   @override
   int get hashCode => Object.hash(value, label);
+}
+
+/// Synthèse d'un ensemble de notes (écran Notes, accueil).
+@immutable
+class GradeStats {
+  const GradeStats._(this.average, this.best, this.worst, this.byDate);
+
+  factory GradeStats.of(List<Grade> grades) {
+    double weighted = 0;
+    double coefficients = 0;
+    Grade? best;
+    Grade? worst;
+    for (final Grade g in grades) {
+      final double on20 = g.on20;
+      if (g.coefficient > 0) {
+        weighted += on20 * g.coefficient;
+        coefficients += g.coefficient;
+      }
+      if (best == null || on20 > best.on20) best = g;
+      if (worst == null || on20 < worst.on20) worst = g;
+    }
+    final List<Grade> byDate = List<Grade>.of(grades);
+    // Tri stable (List.sort ne l'est pas) : du plus récent au plus ancien,
+    // notes sans date à la fin, ordre de la page sinon.
+    final Map<Grade, int> order = {for (int i = 0; i < grades.length; i++) grades[i]: i};
+    byDate.sort((Grade a, Grade b) {
+      final DateTime? da = a.date;
+      final DateTime? db = b.date;
+      if (da != null && db != null && da != db) return db.compareTo(da);
+      if (da == null && db != null) return 1;
+      if (da != null && db == null) return -1;
+      return order[a]!.compareTo(order[b]!);
+    });
+    return GradeStats._(
+      coefficients == 0 ? null : weighted / coefficients,
+      best,
+      worst,
+      byDate,
+    );
+  }
+
+  /// Moyenne pondérée par les coefficients, sur 20 (`null` sans note).
+  final double? average;
+  final Grade? best;
+  final Grade? worst;
+
+  /// Notes de la plus récente à la plus ancienne (sans date : à la fin).
+  final List<Grade> byDate;
 }
 
 /// Notes d'un semestre et semestres disponibles.
