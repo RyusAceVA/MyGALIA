@@ -36,6 +36,20 @@ class _FakeGradesController extends GradesController {
   Future<void> refresh() async {}
 }
 
+/// Un état par semestre (clé = valeur du semestre, '' = courant).
+class _FakeGradesControllerByPeriod extends GradesController {
+  _FakeGradesControllerByPeriod(this.states);
+
+  final Map<String, DataState<GradesSnapshot>> states;
+
+  @override
+  DataState<GradesSnapshot> build(String period) =>
+      states[period] ?? const DataLoading<GradesSnapshot>();
+
+  @override
+  Future<void> refresh() async {}
+}
+
 WeekSchedule _week() {
   final DateTime monday = mondayOf(DateTime.now());
   return WeekSchedule(
@@ -137,6 +151,35 @@ void main() {
     expect(find.textContaining('12,5'), findsOneWidget);
     expect(find.text('coef. 1'), findsOneWidget);
     expect(find.text('Semestre'), findsWidgets);
+  });
+
+  testWidgets('notes : le sélecteur reste visible pendant le changement de semestre', (tester) async {
+    const List<SchoolPeriod> periods = [
+      SchoolPeriod(value: '31', label: 'SEMESTRE 2 (du 29/09/2025 au 11/09/2026)'),
+      SchoolPeriod(value: '30', label: 'SEMESTRE 1 (du 16/09/2024 au 19/09/2025)'),
+    ];
+    await _pump(tester, const GradesScreen(), [
+      gradesControllerProvider.overrideWith(
+        () => _FakeGradesControllerByPeriod({
+          '': DataSuccess<GradesSnapshot>(
+            const GradesSnapshot(periods: periods, selectedPeriod: '30', grades: []),
+            DateTime.now(),
+          ),
+          '31': const DataLoading<GradesSnapshot>(),
+        }),
+      ),
+    ]);
+    expect(find.text('SEMESTRE 1 (2024-2025)'), findsWidgets);
+
+    await tester.tap(find.byType(DropdownMenu<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SEMESTRE 2 (du 29/09/2025 au 11/09/2026)').last);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(DropdownMenu<String>), findsOneWidget);
+    expect(find.text('SEMESTRE 2 (2025-2026)'), findsWidgets);
   });
 
   test('formatNumber : virgule décimale française', () {

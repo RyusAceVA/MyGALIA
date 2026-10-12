@@ -21,19 +21,11 @@ class GradesScreen extends ConsumerWidget {
         ref.watch(gradesControllerProvider(period));
     final GradesController controller =
         ref.read(gradesControllerProvider(period).notifier);
-
-    ref.listen<DataState<GradesSnapshot>>(
-      gradesControllerProvider(period),
-      (DataState<GradesSnapshot>? previous, DataState<GradesSnapshot> next) {
-        final List<SchoolPeriod>? periods = next.data?.periods;
-        if (periods != null && periods.isNotEmpty) {
-          ref.read(knownPeriodsProvider.notifier).state = periods;
-        }
-      },
-    );
+    // Lu sans condition : le provider (autoDispose) vit autant que l'écran.
+    final List<SchoolPeriod> known = ref.watch(knownPeriodsProvider);
     final List<SchoolPeriod> current = state.data?.periods ?? const <SchoolPeriod>[];
-    final List<SchoolPeriod> periods =
-        current.isNotEmpty ? current : ref.watch(knownPeriodsProvider);
+    // Pendant le chargement d'un autre semestre, le sélecteur reste affiché.
+    final List<SchoolPeriod> periods = current.isNotEmpty ? current : known;
     final String? selected = period.isEmpty ? state.data?.selectedPeriod : period;
 
     return Scaffold(
@@ -57,9 +49,9 @@ class GradesScreen extends ConsumerWidget {
                     ),
                 ],
                 onSelected: (String? value) {
-                  if (value != null) {
-                    ref.read(gradesPeriodProvider.notifier).state = value;
-                  }
+                  if (value == null) return;
+                  ref.read(knownPeriodsProvider.notifier).state = periods;
+                  ref.read(gradesPeriodProvider.notifier).state = value;
                 },
               ),
             ),
