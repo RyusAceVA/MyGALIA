@@ -4,7 +4,7 @@
          réseau (échec systématique, « Réessayer » compris). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="mygalia"
+        android:label="MyGalia"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
