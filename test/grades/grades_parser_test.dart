@@ -41,6 +41,16 @@ void main() {
     expect(page.periodFieldName, r'ctl00$MainContent$DropDownLstPeriode');
   });
 
+  test('libellé court du semestre', () {
+    const SchoolPeriod period = SchoolPeriod(
+      value: '30',
+      label: 'SEMESTRE 1 (du 16/09/2024 au 19/09/2025)',
+    );
+
+    expect(period.shortLabel, 'SEMESTRE 1 (2024-2025)');
+    expect(const SchoolPeriod(value: '1', label: 'ANNÉE').shortLabel, 'ANNÉE');
+  });
+
   test('formulaire complet : cachés, select, radio coché, jamais le bouton', () {
     final Map<String, String> form = GradesParser.extractFormFields(
       html_parser.parse(FakeScFormServer.notesPageHtml(period: '30')),

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
+import 'package:mygalia/core/presentation/home_shell.dart';
 import 'package:mygalia/core/presentation/splash_screen.dart';
 import 'package:mygalia/core/theme/app_theme.dart';
+import 'package:mygalia/features/auth/presentation/auth_controller.dart';
+import 'package:mygalia/features/auth/presentation/login_screen.dart';
 
 /// Widget racine de MyGalia.
 ///
 /// Configure Material 3 (thèmes clair/sombre + suivi du mode système) et
-/// pointe vers l'écran de garde. Le routeur définitif (auth guard -> shell)
-/// remplacera `home` lors d'une étape ultérieure.
+/// aiguille vers l'écran adapté à l'état de connexion.
 class MyGaliaApp extends StatelessWidget {
   const MyGaliaApp({super.key});
 
@@ -23,7 +26,21 @@ class MyGaliaApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system, // suit le réglage de l'OS pour l'instant
 
-      home: const SplashScreen(),
+      home: const AuthGate(),
     );
+  }
+}
+
+/// Écran de garde pendant la lecture du coffre, puis connexion ou accueil.
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return switch (ref.watch(authControllerProvider)) {
+      AuthRestoring() => const SplashScreen(),
+      AuthSignedOut(:final String? message) => LoginScreen(message: message),
+      AuthSignedIn() => const HomeShell(),
+    };
   }
 }

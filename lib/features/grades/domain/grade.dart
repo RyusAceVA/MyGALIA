@@ -55,6 +55,16 @@ class SchoolPeriod {
   /// Libellé affiché (« SEMESTRE 1 (du 16/09/2024 au 19/09/2025) »).
   final String label;
 
+  static final RegExp _dates = RegExp(
+    r'^(.*?)\s*\(\s*du\s+\d{1,2}/\d{1,2}/(\d{4})\s+au\s+\d{1,2}/\d{1,2}/(\d{4})\s*\)\s*$',
+  );
+
+  /// Libellé court pour un champ étroit : « SEMESTRE 1 (2024-2025) ».
+  String get shortLabel {
+    final Match? m = _dates.firstMatch(label);
+    return m == null ? label : '${m.group(1)} (${m.group(2)}-${m.group(3)})';
+  }
+
   Map<String, Object?> toJson() => {'value': value, 'label': label};
 
   static SchoolPeriod fromJson(Map<String, Object?> json) => SchoolPeriod(
