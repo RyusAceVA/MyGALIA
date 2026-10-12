@@ -34,6 +34,16 @@ class EdcSession {
         'createdAt': createdAt.toUtc().toIso8601String(),
       };
 
+  /// Debug uniquement : copie que le serveur refusera (cookies et segment
+  /// faussés), pour simuler une expiration de session côté serveur.
+  EdcSession debugCorrupted() => EdcSession(
+        jar: CookieJar(jar.cookies)..debugCorruptValues(),
+        segment: segment == null ? null : '(S(sessioninvalideedebug0))',
+        planningId: planningId,
+        generation: generation,
+        createdAt: createdAt,
+      );
+
   /// Session relue du coffre, ou `null` si le contenu est incomplet ou
   /// corrompu (elle sera alors simplement rouverte).
   static EdcSession? tryFromJson(Map<String, Object?> json) {

@@ -198,9 +198,11 @@ class FakeScFormServer {
       if (auth == null) return _redirect(res, '/GaliaEDC/Login.aspx');
       _validAuth = auth;
       _validSegment = segment;
+      final String sessionId = 'SIDSECRET$_counter';
+      issuedSecrets.add(sessionId);
       res.headers
         ..add('set-cookie', '.ASPXAUTH=$auth; path=/; HttpOnly; SameSite=Lax')
-        ..add('set-cookie', 'ASP.NET_SessionId=sid$_counter; path=/; HttpOnly');
+        ..add('set-cookie', 'ASP.NET_SessionId=$sessionId; path=/; HttpOnly');
       return _redirect(res, '/GaliaEDC/$segment/Accueil/Stagiaire.aspx');
     }
     // Les compteurs comptent les TENTATIVES, acceptées ou non.
@@ -255,7 +257,9 @@ class FakeScFormServer {
       res.statusCode = 404;
       return;
     }
-    res.headers.add('set-cookie', 'ASP.NET_SessionId=planning$_counter; path=/; HttpOnly');
+    final String planningSession = 'PLANSECRET$_counter';
+    issuedSecrets.add(planningSession);
+    res.headers.add('set-cookie', 'ASP.NET_SessionId=$planningSession; path=/; HttpOnly');
     final String? override = planningBodyOverride;
     if (override != null) return _html(res, override);
     _html(

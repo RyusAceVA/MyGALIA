@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:mygalia/core/debug/debug_tools_screen.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
 
-enum _AccountAction { signOut }
+enum _AccountAction { diagnostics, signOut }
 
-/// Menu du compte (barre d'application) : déconnexion.
+/// Menu du compte (barre d'application) : déconnexion et, en debug
+/// uniquement, outils de diagnostic.
 class AccountMenuButton extends ConsumerWidget {
   const AccountMenuButton({super.key});
 
@@ -17,6 +20,10 @@ class AccountMenuButton extends ConsumerWidget {
       icon: const Icon(Icons.account_circle_outlined),
       onSelected: (_AccountAction action) {
         switch (action) {
+          case _AccountAction.diagnostics:
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const DebugToolsScreen()),
+            );
           case _AccountAction.signOut:
             _confirmSignOut(context, ref);
         }
@@ -24,6 +31,16 @@ class AccountMenuButton extends ConsumerWidget {
       itemBuilder: (BuildContext context) => [
         if (auth is AuthSignedIn)
           PopupMenuItem<_AccountAction>(enabled: false, child: Text(auth.email)),
+        // Constante à la compilation : absent (et retiré) en release.
+        if (kDebugMode)
+          const PopupMenuItem<_AccountAction>(
+            value: _AccountAction.diagnostics,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.bug_report_outlined),
+              title: Text('Diagnostic (debug)'),
+            ),
+          ),
         const PopupMenuItem<_AccountAction>(
           value: _AccountAction.signOut,
           child: ListTile(

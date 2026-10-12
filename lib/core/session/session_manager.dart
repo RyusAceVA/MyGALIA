@@ -120,6 +120,58 @@ class SessionManager {
     _sessionLost.close();
   }
 
+  /// Debug uniquement : rend la session courante invalide côté serveur
+  /// (cookies et segment faussés), et si [alsoApiToken] le jeton API aussi.
+  /// La requête suivante doit réparer la session toute seule.
+  Future<bool> debugInvalidate({required bool alsoApiToken}) async {
+    if (!kDebugMode) return false;
+    await (_restoring ??= _restore());
+    final EdcSession? session = _session;
+    if (session != null) {
+      final EdcSession corrupted = session.debugCorrupted();
+      _session = corrupted;
+      await _persist(corrupted);
+    }
+    if (alsoApiToken) {
+      final ApiToken fake = ApiToken(
+        'jeton-invalide-debug',
+        expiresAt: _clock().add(const Duration(hours: 1)),
+      );
+      _apiToken = fake;
+      try {
+        await _storage.saveApiToken(fake);
+      } on CacheFailure {
+        AppLog.error('jeton API factice non persisté');
+      }
+    }
+    AppLog.session(
+      'DEBUG : session invalidée${alsoApiToken ? ' (jeton API compris)' : ''}'
+      ' — la prochaine requête doit se réparer seule',
+    );
+    return session != null || alsoApiToken;
+  }
+
+  /// Debug uniquement : résumé lisible de la session, sans aucune valeur
+  /// secrète (noms de cookies seulement).
+  String debugSummary() {
+    if (!kDebugMode) return '';
+    final EdcSession? session = _session;
+    final ApiToken? token = _apiToken;
+    final String api = token == null
+        ? 'jeton API : non chargé'
+        : 'jeton API : expire ${token.expiresAt?.toLocal() ?? '(date inconnue)'}';
+    if (session == null) {
+      return 'Session école : aucune en mémoire · $api · '
+          'reconnexions : $_renewals';
+    }
+    return 'Session école : génération ${session.generation}, ouverte le '
+        '${session.createdAt.toLocal()} · cookies : '
+        '${session.jar.names.join(', ')} · segment (S(…)) : '
+        '${session.segment == null ? 'absent' : 'présent'} · pkEntite : '
+        '${session.planningId == null ? 'absent' : 'présent'} · $api · '
+        'reconnexions : $_renewals';
+  }
+
   Future<void> _restore() async {
     final int epoch = _epoch;
     final Map<String, Object?>? json = await _storage.readEdcSession();

@@ -85,7 +85,8 @@ class AuthController extends Notifier<AuthState> {
   /// Déconnexion (volontaire ou identifiants refusés).
   Future<void> signOut({String? message}) async {
     await _purge();
-    AppLog.auth('déconnexion${message == null ? '' : ' : $message'}');
+    // Le message du serveur n'est pas journalisé (il peut citer l'e-mail).
+    AppLog.auth(message == null ? 'déconnexion' : 'déconnexion (session perdue)');
     state = AuthSignedOut(message: message);
   }
 
