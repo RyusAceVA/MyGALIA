@@ -70,32 +70,41 @@ class SettingsScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<ThemeMode>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.light,
-                          icon: Icon(Icons.light_mode_outlined),
-                          label: Text('Clair'),
+                  LayoutBuilder(
+                    builder: (BuildContext context, BoxConstraints constraints) {
+                      // Icônes seulement s'il y a la place : sur un écran
+                      // étroit, « Sombre » passerait à la ligne.
+                      final double textScale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      final bool icons = constraints.maxWidth >= 320 * textScale;
+                      return SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<ThemeMode>(
+                          showSelectedIcon: false,
+                          segments: [
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.light,
+                              icon: icons ? const Icon(Icons.light_mode_outlined) : null,
+                              label: const Text('Clair'),
+                            ),
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.dark,
+                              icon: icons ? const Icon(Icons.dark_mode_outlined) : null,
+                              label: const Text('Sombre'),
+                            ),
+                            ButtonSegment<ThemeMode>(
+                              value: ThemeMode.system,
+                              icon: icons ? const Icon(Icons.brightness_auto_outlined) : null,
+                              label: const Text('Auto'),
+                            ),
+                          ],
+                          selected: {themeMode},
+                          onSelectionChanged: (Set<ThemeMode> selection) => ref
+                              .read(themeModeProvider.notifier)
+                              .select(selection.first),
                         ),
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.dark,
-                          icon: Icon(Icons.dark_mode_outlined),
-                          label: Text('Sombre'),
-                        ),
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.system,
-                          icon: Icon(Icons.brightness_auto_outlined),
-                          label: Text('Auto'),
-                        ),
-                      ],
-                      selected: {themeMode},
-                      onSelectionChanged: (Set<ThemeMode> selection) => ref
-                          .read(themeModeProvider.notifier)
-                          .select(selection.first),
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
