@@ -4,11 +4,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:mygalia/app.dart';
 import 'package:mygalia/core/constants/app_constants.dart';
+import 'package:mygalia/core/debug/app_log.dart';
 
 /// Point d'entrée de MyGalia.
 ///
 /// Ordre d'initialisation :
-///   1. Binding Flutter (obligatoire avant tout appel asynchrone au démarrage).  
+///   1. Binding Flutter (obligatoire avant tout appel asynchrone au démarrage).
 ///   2. Hive (cache local) + ouverture des boîtes de base.
 ///   3. Montage de l'arbre sous [ProviderScope] — racine de Riverpod : tous les
 ///      providers de l'app y vivent.
@@ -18,8 +19,8 @@ Future<void> main() async {
 
   // --- Stockage local (Hive) ---------------------------------------------
   await Hive.initFlutter();
-  await Hive.openBox<dynamic>(AppConstants.settingsBox);
-  await Hive.openBox<dynamic>(AppConstants.cacheBox);
+  await _openBox(AppConstants.settingsBox);
+  await _openBox(AppConstants.cacheBox);
 
   // ProviderScope : conteneur racine de Riverpod. Indispensable pour que
   // n'importe quel widget descendant puisse lire/observer des providers.
@@ -28,4 +29,17 @@ Future<void> main() async {
       child: MyGaliaApp(),
     ),
   );
+}
+
+/// Ouvre une boîte Hive. Si son fichier est illisible, elle est recréée vide
+/// plutôt que de bloquer le démarrage : le cache se reconstruit depuis le
+/// serveur, alors qu'une exception ici laisserait l'app figée au lancement.
+Future<void> _openBox(String name) async {
+  try {
+    await Hive.openBox<dynamic>(name);
+  } on Object catch (e) {
+    AppLog.error('Hive : boîte « $name » illisible (${e.runtimeType}), recréée');
+    await Hive.deleteBoxFromDisk(name);
+    await Hive.openBox<dynamic>(name);
+  }
 }
