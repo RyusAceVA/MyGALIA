@@ -10,10 +10,7 @@ import 'package:mygalia/features/grades/presentation/grades_controller.dart';
 
 /// Notes : semestres, moyenne générale, meilleure / plus basse note, liste.
 class GradesScreen extends ConsumerWidget {
-  const GradesScreen({super.key, this.actions = const <Widget>[]});
-
-  /// Actions supplémentaires de la barre d'application.
-  final List<Widget> actions;
+  const GradesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,7 +27,7 @@ class GradesScreen extends ConsumerWidget {
     final String? selected = period.isEmpty ? state.data?.selectedPeriod : period;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notes'), actions: actions),
+      appBar: AppBar(title: const Text('Notes')),
       body: Column(
         children: [
           if (periods.isNotEmpty)
@@ -149,17 +146,19 @@ class _SummaryCard extends StatelessWidget {
               style: theme.textTheme.labelMedium?.copyWith(color: muted, letterSpacing: 1.6),
             ),
             const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  average == null ? '—' : formatNumber(average),
-                  style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(width: 6),
-                Text('/ 20', style: theme.textTheme.titleMedium?.copyWith(color: muted)),
-              ],
+            // Un seul texte : même ligne de base, et retour à la ligne
+            // plutôt que débordement sur un petit écran.
+            Text.rich(
+              TextSpan(
+                text: average == null ? '—' : formatNumber(average),
+                style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w700),
+                children: [
+                  TextSpan(
+                    text: '  / 20',
+                    style: theme.textTheme.titleMedium?.copyWith(color: muted),
+                  ),
+                ],
+              ),
             ),
             Text(
               'Moyenne pondérée par les coefficients',
@@ -220,7 +219,14 @@ class _StatColumn extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(width: 6),
-            Text(label, style: theme.textTheme.labelLarge?.copyWith(color: muted)),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(color: muted),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -268,17 +274,28 @@ class GradeTile extends StatelessWidget {
                   if (type != null)
                     Text(type, style: theme.textTheme.bodyMedium?.copyWith(color: muted)),
                   const SizedBox(height: 6),
-                  Row(
+                  // Wrap : date et coefficient passent à la ligne si besoin.
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (date != null) ...[
-                        Icon(Icons.event_outlined, size: 14, color: muted),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormatFr.dateLong(date),
-                          style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                      if (date != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.event_outlined, size: 14, color: muted),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                DateFormatFr.dateLong(date),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                      ],
                       Text(
                         'coef. ${formatNumber(grade.coefficient)}',
                         style: theme.textTheme.bodySmall?.copyWith(color: muted),

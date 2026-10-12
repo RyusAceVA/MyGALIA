@@ -12,10 +12,7 @@ import 'package:mygalia/features/schedule/presentation/widgets/course_tile.dart'
 /// Emploi du temps : semaine, bande des jours, séances du jour choisi,
 /// saut de période de cours en période de cours, pull-to-refresh.
 class ScheduleScreen extends ConsumerWidget {
-  const ScheduleScreen({super.key, this.actions = const <Widget>[]});
-
-  /// Actions supplémentaires de la barre d'application.
-  final List<Widget> actions;
+  const ScheduleScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,7 +40,6 @@ class ScheduleScreen extends ConsumerWidget {
             icon: const Icon(Icons.today_outlined),
             onPressed: () => select(DateTime.now()),
           ),
-          ...actions,
         ],
       ),
       body: Column(
@@ -354,26 +350,33 @@ class _PeriodJumpBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
+      // Boutons flexibles : sur un petit écran (ou en grand texte), le
+      // libellé s'abrège au lieu de déborder.
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _JumpButton(
-            label: 'Cours précédents',
-            icon: Icons.skip_previous_rounded,
-            iconAtEnd: false,
-            searching: searching == PeriodJumpDirection.previous,
-            onPressed: searching == PeriodJumpDirection.next
-                ? null
-                : () => onJump(PeriodJumpDirection.previous),
+          Flexible(
+            child: _JumpButton(
+              label: 'Cours précédents',
+              icon: Icons.skip_previous_rounded,
+              iconAtEnd: false,
+              searching: searching == PeriodJumpDirection.previous,
+              onPressed: searching == PeriodJumpDirection.next
+                  ? null
+                  : () => onJump(PeriodJumpDirection.previous),
+            ),
           ),
-          const Spacer(),
-          _JumpButton(
-            label: 'Prochains cours',
-            icon: Icons.skip_next_rounded,
-            iconAtEnd: true,
-            searching: searching == PeriodJumpDirection.next,
-            onPressed: searching == PeriodJumpDirection.previous
-                ? null
-                : () => onJump(PeriodJumpDirection.next),
+          const SizedBox(width: 8),
+          Flexible(
+            child: _JumpButton(
+              label: 'Prochains cours',
+              icon: Icons.skip_next_rounded,
+              iconAtEnd: true,
+              searching: searching == PeriodJumpDirection.next,
+              onPressed: searching == PeriodJumpDirection.previous
+                  ? null
+                  : () => onJump(PeriodJumpDirection.next),
+            ),
           ),
         ],
       ),
@@ -407,7 +410,11 @@ class _JumpButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(icon),
-      label: Text(searching ? 'Recherche… (annuler)' : label),
+      label: Text(
+        searching ? 'Recherche… (annuler)' : label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }

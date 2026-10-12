@@ -8,15 +8,15 @@ import 'package:mygalia/core/debug/app_log.dart';
 import 'package:mygalia/core/lifecycle/network_status.dart';
 import 'package:mygalia/core/lifecycle/refresh_signals.dart';
 
+/// Source de l'état réseau (remplacée dans les tests : pas de plugin natif).
+final connectivityProvider = Provider<Connectivity>((ref) => Connectivity());
+
 /// Émet les signaux de rechargement : retour au premier plan, retour du
 /// réseau. Monté avec l'écran principal (utilisateur connecté).
 class AppLifecycleWatcher extends ConsumerStatefulWidget {
-  const AppLifecycleWatcher({super.key, required this.child, this.connectivity});
+  const AppLifecycleWatcher({super.key, required this.child});
 
   final Widget child;
-
-  /// Injectable pour les tests.
-  final Connectivity? connectivity;
 
   @override
   ConsumerState<AppLifecycleWatcher> createState() => _AppLifecycleWatcherState();
@@ -34,7 +34,7 @@ class _AppLifecycleWatcherState extends ConsumerState<AppLifecycleWatcher> {
     _lifecycle = AppLifecycleListener(
       onResume: () => signals.emit(RefreshReason.resumed),
     );
-    final Connectivity connectivity = widget.connectivity ?? Connectivity();
+    final Connectivity connectivity = ref.read(connectivityProvider);
     _connectivitySub = connectivity.onConnectivityChanged.listen(
       _onConnectivity,
       onError: (Object error) =>

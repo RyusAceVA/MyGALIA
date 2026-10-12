@@ -35,23 +35,22 @@ class CourseTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(width: 6, color: accent),
+            // Colonne des horaires à sa largeur naturelle (chiffres à chasse
+            // fixe) : jamais tronquée, même en grand texte.
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 16, 4, 16),
-              child: SizedBox(
-                width: 52,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      DateFormatFr.time(course.start),
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      DateFormatFr.time(course.end),
-                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                    ),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    DateFormatFr.time(course.start),
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    DateFormatFr.time(course.end),
+                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                  ),
+                ],
               ),
             ),
             Expanded(
