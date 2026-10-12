@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mygalia/core/clock.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/home_tabs.dart';
 import 'package:mygalia/core/storage/secure_storage_service.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
@@ -102,6 +104,16 @@ Future<ProviderContainer> _pumpHome(
   return container;
 }
 
+/// Forme de la carte qui contient [text].
+MaterialShape _shapeOfCardWith(WidgetTester tester, String text) => tester
+    .widget<ShapeBadge>(
+      find.descendant(
+        of: find.ancestor(of: find.text(text), matching: find.byType(Card)).first,
+        matching: find.byType(ShapeBadge),
+      ),
+    )
+    .shape;
+
 void main() {
   testWidgets('pendant un cours : carte « En cours », compteur, planning du jour, notes', (tester) async {
     await _pumpHome(tester, now: DateTime(2026, 10, 12, 10), week: _schoolWeek);
@@ -149,5 +161,38 @@ void main() {
     await tester.pump();
 
     expect(container.read(homeTabProvider), HomeTab.grades);
+  });
+
+  testWidgets('carte principale : éclat pendant un cours', (tester) async {
+    await _pumpHome(tester, now: DateTime(2026, 10, 12, 10), week: _schoolWeek);
+    expect(_shapeOfCardWith(tester, 'EN COURS'), same(MaterialShapes.softBurst));
+  });
+
+  testWidgets('carte principale : trèfle avant le prochain cours', (tester) async {
+    await _pumpHome(tester, now: DateTime(2026, 10, 12, 12, 30), week: _schoolWeek);
+    expect(_shapeOfCardWith(tester, 'À VENIR'), same(MaterialShapes.clover4));
+  });
+
+  testWidgets('carte principale : biscuit en fin de journée', (tester) async {
+    await _pumpHome(tester, now: DateTime(2026, 10, 12, 17), week: _schoolWeek);
+    expect(_shapeOfCardWith(tester, 'Journée terminée'), same(MaterialShapes.cookie9));
+  });
+
+  testWidgets('carte principale : pentagone en entreprise', (tester) async {
+    final WeekSchedule company = WeekSchedule(monday: _monday, courses: [
+      for (int d = 0; d < 5; d++) _c(d, 8, 30, 12, 0, 'Presence en entreprise'),
+    ]);
+    await _pumpHome(tester, now: DateTime(2026, 10, 12, 10), week: company);
+    expect(_shapeOfCardWith(tester, 'Trouver les prochains cours'), same(MaterialShapes.pentagon));
+  });
+
+  testWidgets('l\'initiale du compte ouvre les Paramètres', (tester) async {
+    final ProviderContainer container =
+        await _pumpHome(tester, now: DateTime(2026, 10, 12, 10), week: _schoolWeek);
+
+    await tester.tap(find.byTooltip('Paramètres'));
+    await tester.pump();
+
+    expect(container.read(homeTabProvider), HomeTab.settings);
   });
 }

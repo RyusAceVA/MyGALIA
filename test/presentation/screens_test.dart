@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
 import 'package:mygalia/features/grades/presentation/grades_controller.dart';
@@ -208,6 +210,38 @@ void main() {
     expect(find.text('19 septembre 2025'), findsOneWidget);
     expect(find.text('SEMESTRE 2'), findsOneWidget);
     expect(find.text('SEMESTRE 1'), findsOneWidget);
+  });
+
+  testWidgets('notes : chaque note dans une forme, soleil dès 16 sur 20', (tester) async {
+    await _pump(tester, const GradesScreen(), [
+      gradesControllerProvider.overrideWith(
+        () => _FakeGradesController(
+          DataSuccess<GradesSnapshot>(
+            GradesSnapshot(
+              periods: const [],
+              selectedPeriod: null,
+              grades: [
+                Grade(value: 17, coefficient: 1, subject: 'Réseaux', date: DateTime(2026, 9, 2)),
+                Grade(value: 12.5, coefficient: 1, subject: 'Anglais', date: DateTime(2026, 9, 1)),
+              ],
+            ),
+            DateTime.now(),
+          ),
+        ),
+      ),
+    ]);
+
+    MaterialShape shapeOf(String subject) => tester
+        .widget<ShapeBadge>(
+          find.descendant(
+            of: find.ancestor(of: find.text(subject), matching: find.byType(GradeTile)).first,
+            matching: find.byType(ShapeBadge),
+          ),
+        )
+        .shape;
+    expect(shapeOf('Réseaux'), same(MaterialShapes.sunny));
+    expect(shapeOf('Anglais'), same(MaterialShapes.cookie9));
+    expect(find.text('2 notes'), findsOneWidget);
   });
 
   testWidgets('notes : le sélecteur reste visible pendant le changement de semestre', (tester) async {

@@ -4,6 +4,8 @@ import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/presentation/expressive/expressive_refresh_indicator.dart';
 import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 
@@ -129,7 +131,13 @@ class ErrorPanel extends StatelessWidget {
       padding: const EdgeInsets.only(top: 96),
       child: Column(
         children: [
-          Icon(icon, size: 48, color: theme.colorScheme.error),
+          ShapeBadge(
+            shape: MaterialShapes.cookie6,
+            initialShape: MaterialShapes.circle,
+            size: 88,
+            color: theme.colorScheme.errorContainer,
+            child: Icon(icon, size: 40, color: theme.colorScheme.onErrorContainer),
+          ),
           const SizedBox(height: 16),
           Text(title, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
           const SizedBox(height: 8),

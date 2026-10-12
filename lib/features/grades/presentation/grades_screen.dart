@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/presentation/widgets/section_title.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
@@ -134,34 +136,46 @@ class _SummaryCard extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final Color muted = theme.colorScheme.onSurfaceVariant;
     final double? average = stats.average;
+    final int count = stats.byDate.length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'MOYENNE GÉNÉRALE',
-              style: theme.textTheme.labelMedium?.copyWith(color: muted, letterSpacing: 1.6),
-            ),
-            const SizedBox(height: 4),
-            // Un seul texte : même ligne de base, et retour à la ligne
-            // plutôt que débordement sur un petit écran.
-            Text.rich(
-              TextSpan(
-                text: average == null ? '—' : formatNumber(average),
-                style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w700),
-                children: [
-                  TextSpan(
-                    text: '  / 20',
-                    style: theme.textTheme.titleMedium?.copyWith(color: muted),
+            Row(
+              children: [
+                GradeShape(
+                  on20: average,
+                  text: average == null ? '—' : formatNumber(average),
+                  outOf: '/ 20',
+                  size: 112,
+                  large: true,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'MOYENNE GÉNÉRALE',
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: muted, letterSpacing: 1.6),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        count <= 1 ? '$count note' : '$count notes',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Moyenne pondérée par les coefficients',
+                        style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            Text(
-              'Moyenne pondérée par les coefficients',
-              style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(
@@ -305,20 +319,10 @@ class GradeTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Text.rich(
-              TextSpan(
-                text: formatNumber(grade.value),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: gradeColor(theme, grade.on20),
-                ),
-                children: [
-                  TextSpan(
-                    text: ' / ${formatNumber(grade.outOf)}',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                  ),
-                ],
-              ),
+            GradeShape(
+              on20: grade.on20,
+              text: formatNumber(grade.value),
+              outOf: '/ ${formatNumber(grade.outOf)}',
             ),
           ],
         ),
@@ -337,8 +341,18 @@ class _EmptyGrades extends StatelessWidget {
       padding: const EdgeInsets.only(top: 96),
       child: Column(
         children: [
-          Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: 12),
+          ShapeBadge(
+            shape: MaterialShapes.clover8,
+            initialShape: MaterialShapes.circle,
+            size: 96,
+            color: theme.colorScheme.secondaryContainer,
+            child: Icon(
+              Icons.inbox_outlined,
+              size: 40,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(height: 16),
           Text('Aucune note pour ce semestre.', style: theme.textTheme.bodyLarge),
         ],
       ),
@@ -346,17 +360,81 @@ class _EmptyGrades extends StatelessWidget {
   }
 }
 
+/// Note (ou moyenne) dans une forme Material 3 Expressive : biscuit, ou
+/// soleil dès 16 sur 20 ; vert dès 14, rouge sous 10.
+class GradeShape extends StatelessWidget {
+  const GradeShape({
+    super.key,
+    required this.on20,
+    required this.text,
+    required this.outOf,
+    this.size = 64,
+    this.large = false,
+  });
+
+  /// Valeur ramenée sur 20 (couleur et forme) ; nulle : neutre.
+  final double? on20;
+  final String text;
+  final String outOf;
+  final double size;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final (Color fill, Color ink) = gradeContainerColors(theme, on20);
+    final double? value = on20;
+    return ShapeBadge(
+      shape: value != null && value >= 16 ? MaterialShapes.sunny : MaterialShapes.cookie9,
+      initialShape: large ? MaterialShapes.circle : null,
+      size: size,
+      color: fill,
+      child: Padding(
+        // Le texte reste dans le disque intérieur de la forme.
+        padding: EdgeInsets.all(size * 0.17),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                text,
+                style: (large ? theme.textTheme.headlineMedium : theme.textTheme.titleMedium)
+                    ?.copyWith(color: ink, fontWeight: FontWeight.w800, height: 1.1),
+              ),
+              Text(
+                outOf,
+                style: (large ? theme.textTheme.labelLarge : theme.textTheme.labelSmall)
+                    ?.copyWith(color: ink.withValues(alpha: 0.8), height: 1.1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fond et encre d'une forme portant une note sur 20.
+(Color, Color) gradeContainerColors(ThemeData theme, double? on20) {
+  final ColorScheme scheme = theme.colorScheme;
+  final double? value = on20;
+  if (value == null) return (scheme.surfaceContainerHighest, scheme.onSurfaceVariant);
+  if (value >= 14) {
+    final Color success = successColor(theme);
+    return (
+      success.withValues(alpha: theme.brightness == Brightness.dark ? 0.24 : 0.16),
+      success,
+    );
+  }
+  if (value < 10) return (scheme.errorContainer, scheme.onErrorContainer);
+  return (scheme.secondaryContainer, scheme.onSecondaryContainer);
+}
+
 /// Vert lisible en clair comme en sombre.
 Color successColor(ThemeData theme) => theme.brightness == Brightness.dark
     ? const Color(0xFF4ADE80)
     : const Color(0xFF16A34A);
-
-/// Couleur d'une note sur 20 : verte dès 14, rouge sous 10.
-Color gradeColor(ThemeData theme, double on20) {
-  if (on20 >= 14) return successColor(theme);
-  if (on20 < 10) return theme.colorScheme.error;
-  return theme.colorScheme.onSurface;
-}
 
 /// « 12,5 », « 12 », « 16,75 » (virgule décimale française).
 String formatNumber(double value) {

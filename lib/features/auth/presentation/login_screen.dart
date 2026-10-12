@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
 
 /// Écran de connexion avec le compte SC Form.
@@ -72,6 +74,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: ShapeBadge(
+                          shape: MaterialShapes.cookie9,
+                          initialShape: MaterialShapes.circle,
+                          size: 88,
+                          color: theme.colorScheme.primaryContainer,
+                          child: Icon(
+                            Icons.school_rounded,
+                            size: 40,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       Text(
                         AppConstants.appName,
                         style: theme.textTheme.displaySmall?.copyWith(

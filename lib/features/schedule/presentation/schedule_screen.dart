@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
@@ -434,8 +436,18 @@ class _EmptyDay extends StatelessWidget {
       padding: const EdgeInsets.only(top: 72),
       child: Column(
         children: [
-          Icon(Icons.event_available_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: 12),
+          ShapeBadge(
+            shape: MaterialShapes.flower,
+            initialShape: MaterialShapes.circle,
+            size: 96,
+            color: theme.colorScheme.secondaryContainer,
+            child: Icon(
+              Icons.event_available_outlined,
+              size: 40,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(height: 16),
           Text('Pas de cours ce jour', style: theme.textTheme.titleMedium),
           if (upcoming != null) ...[
             const SizedBox(height: 12),

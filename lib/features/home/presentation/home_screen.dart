@@ -6,9 +6,12 @@ import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/presentation/expressive/expressive_refresh_indicator.dart';
 import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/core/presentation/home_tabs.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
+import 'package:mygalia/core/presentation/widgets/profile_shape.dart';
 import 'package:mygalia/core/presentation/widgets/section_title.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
@@ -87,24 +90,44 @@ class HomeScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.paddingOf(context).bottom),
           children: [
-            Text(
-              DateFormatFr.dayLong(now),
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormatFr.dayLong(now),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Bonjour 👋',
+                        style: theme.textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      if (email.isNotEmpty)
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ProfileShape(
+                  email: email,
+                  tooltip: 'Paramètres',
+                  onTap: () => openTab(HomeTab.settings),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Bonjour 👋',
-              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            if (email.isNotEmpty)
-              Text(
-                email,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
             const SizedBox(height: 16),
             const SectionTitle('Prochain cours'),
             _NextCourseCard(
@@ -180,17 +203,21 @@ class _NextCourseCard extends StatelessWidget {
     if (s == null) {
       if (current is DataError<WeekSchedule>) {
         final (IconData icon, String title) = describeFailure(current.failure);
-        return _InfoCard(
+        return _HeroCard(
+          shape: MaterialShapes.cookie6,
+          danger: true,
           icon: icon,
           title: title,
-          message: current.failure.message,
+          details: current.failure.message,
           action: TextButton(onPressed: onRetry, child: const Text('Réessayer')),
         );
       }
-      return const _InfoCard(
+      // Le cercle se transformera en la forme de l'état une fois chargé.
+      return _HeroCard(
+        shape: MaterialShapes.circle,
         icon: Icons.hourglass_empty_rounded,
         title: 'Chargement du planning…',
-        action: WavyLinearProgressIndicator(semanticsLabel: 'Chargement du planning'),
+        progress: const WavyLinearProgressIndicator(semanticsLabel: 'Chargement du planning'),
       );
     }
 
@@ -198,43 +225,62 @@ class _NextCourseCard extends StatelessWidget {
     if (s.ongoing case final Course course) {
       final double total = course.end.difference(course.start).inSeconds.toDouble();
       final double elapsed = now.difference(course.start).inSeconds.toDouble();
-      card = _CourseCard(
-        label: 'EN COURS',
+      card = _HeroCard(
+        shape: MaterialShapes.softBurst,
+        accent: subjectColor(course.subject),
         icon: Icons.timelapse_rounded,
-        course: course,
+        label: 'EN COURS',
+        title: course.subject,
+        details: _timeAndRoom(course),
+        progress: total <= 0
+            ? null
+            : WavyLinearProgressIndicator(
+                value: (elapsed / total).clamp(0, 1).toDouble(),
+                semanticsLabel: 'Avancement du cours',
+              ),
         footer: 'Se termine dans ${DateFormatFr.duration(course.end.difference(now))}',
-        progress: total <= 0 ? null : (elapsed / total).clamp(0, 1).toDouble(),
         onTap: () => onShowDay(course.day),
       );
     } else if (s.next case final Course course) {
-      card = _CourseCard(
-        label: 'À VENIR',
+      card = _HeroCard(
+        shape: MaterialShapes.clover4,
+        accent: subjectColor(course.subject),
         icon: Icons.schedule_rounded,
-        course: course,
+        label: 'À VENIR',
+        title: course.subject,
+        details: _timeAndRoom(course),
         footer: 'Commence dans ${DateFormatFr.duration(course.start.difference(now))}',
         onTap: () => onShowDay(course.day),
       );
     } else {
-      final (IconData icon, String title, String? message) = s.weekend
-          ? (Icons.weekend_outlined, 'Week-end', 'Pas de cours aujourd\'hui.')
+      final (MaterialShape shape, IconData icon, String title, String? message) = s.weekend
+          ? (MaterialShapes.sunny, Icons.weekend_outlined, 'Week-end', 'Pas de cours aujourd\'hui.')
           : s.companyToday
               ? (
+                  MaterialShapes.pentagon,
                   Icons.business_center_outlined,
                   'Présence en entreprise',
                   'Pas de cours à l\'école aujourd\'hui.',
                 )
               : s.today.isEmpty
-                  ? (Icons.event_available_outlined, 'Pas de cours aujourd\'hui', null)
+                  ? (
+                      MaterialShapes.flower,
+                      Icons.event_available_outlined,
+                      'Pas de cours aujourd\'hui',
+                      null,
+                    )
                   : (
+                      MaterialShapes.cookie9,
                       Icons.check_circle_outline_rounded,
                       'Journée terminée',
                       'Plus aucun cours prévu aujourd\'hui.',
                     );
       final Course? later = s.later;
-      card = _InfoCard(
+      card = _HeroCard(
+        shape: shape,
         icon: icon,
         title: title,
-        message: message,
+        details: message,
         action: later != null
             ? TextButton.icon(
                 onPressed: () => onShowDay(later.day),
@@ -283,32 +329,68 @@ class _NextCourseCard extends StatelessWidget {
       ],
     );
   }
+
+  static String _timeAndRoom(Course course) {
+    final String? room = course.room;
+    return '${DateFormatFr.time(course.start)} – ${DateFormatFr.time(course.end)}'
+        '${room == null ? '' : ' · $room'}';
+  }
 }
 
-class _CourseCard extends StatelessWidget {
-  const _CourseCard({
-    required this.label,
+/// Carte principale de l'accueil. Une seule carte pour tous les états :
+/// sa forme se transforme de l'un à l'autre (chargement → à venir → en
+/// cours → journée terminée…).
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({
+    required this.shape,
     required this.icon,
-    required this.course,
-    required this.footer,
-    required this.onTap,
+    required this.title,
+    this.accent,
+    this.danger = false,
+    this.label,
+    this.details,
     this.progress,
+    this.footer,
+    this.action,
+    this.onTap,
   });
 
-  final String label;
+  final MaterialShape shape;
   final IconData icon;
-  final Course course;
-  final String footer;
-  final VoidCallback onTap;
-  final double? progress;
+  final String title;
+
+  /// Couleur de la matière ; à défaut, couleurs primaires du thème.
+  final Color? accent;
+
+  /// Erreur : couleurs d'erreur.
+  final bool danger;
+
+  final String? label;
+  final String? details;
+  final Widget? progress;
+  final String? footer;
+  final Widget? action;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
     final Color muted = scheme.onSurfaceVariant;
-    final String? room = course.room;
-    final double? value = progress;
+    final Color? subject = accent;
+    final (Color fill, Color ink) = danger
+        ? (scheme.errorContainer, scheme.onErrorContainer)
+        : subject != null
+            ? (
+                subject.withValues(alpha: theme.brightness == Brightness.dark ? 0.28 : 0.16),
+                subject,
+              )
+            : (scheme.primaryContainer, scheme.onPrimaryContainer);
+    final String? tag = label;
+    final String? text = details;
+    final Widget? bar = progress;
+    final String? note = footer;
+    final Widget? trailing = action;
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -317,106 +399,55 @@ class _CourseCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: subjectColor(course.subject).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: subjectColor(course.subject)),
+              ShapeBadge(
+                shape: shape,
+                size: 56,
+                color: fill,
+                child: Icon(icon, color: ink, size: 26),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.primary,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w700,
+                    if (tag != null) ...[
+                      Text(
+                        tag,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.primary,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      course.subject,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${DateFormatFr.time(course.start)} – ${DateFormatFr.time(course.end)}'
-                      '${room == null ? '' : ' · $room'}',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                    ),
-                    if (value != null) ...[
-                      const SizedBox(height: 10),
-                      WavyLinearProgressIndicator(
-                        value: value,
-                        semanticsLabel: 'Avancement du cours',
-                      ),
+                      const SizedBox(height: 2),
                     ],
-                    const SizedBox(height: 8),
-                    Text(footer, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                    Text(
+                      title,
+                      style: tag != null
+                          ? theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)
+                          : theme.textTheme.titleMedium,
+                    ),
+                    if (text != null) ...[
+                      SizedBox(height: tag != null ? 4 : 2),
+                      Text(text, style: theme.textTheme.bodyMedium?.copyWith(color: muted)),
+                    ],
+                    if (bar != null) ...[
+                      const SizedBox(height: 10),
+                      bar,
+                    ],
+                    if (note != null) ...[
+                      const SizedBox(height: 8),
+                      Text(note, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                    ],
+                    if (trailing != null) ...[
+                      const SizedBox(height: 8),
+                      trailing,
+                    ],
                   ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    this.message,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final String? text = message;
-    final Widget? trailing = action;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 36, color: theme.colorScheme.primary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium),
-                  if (text != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      text,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                  if (trailing != null) ...[
-                    const SizedBox(height: 8),
-                    trailing,
-                  ],
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -431,25 +462,29 @@ class _RemainingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final Color muted = theme.colorScheme.onSurfaceVariant;
+    final ColorScheme scheme = theme.colorScheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
           children: [
-            Icon(Icons.event_note_outlined, size: 26, color: muted),
-            const SizedBox(width: 16),
-            Text(
-              '$count',
-              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+            ShapeBadge(
+              shape: MaterialShapes.cookie7,
+              size: 48,
+              color: scheme.tertiaryContainer,
+              child: Text(
+                '$count',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: scheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
             Expanded(
               child: Text(
                 count <= 1 ? 'cours restant aujourd\'hui' : 'cours restants aujourd\'hui',
-                style: theme.textTheme.bodyLarge?.copyWith(color: muted),
+                style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -478,10 +513,12 @@ class _LatestGrades extends StatelessWidget {
     }
     if (current is DataError<GradesSnapshot>) {
       final (IconData icon, String title) = describeFailure(current.failure);
-      return _InfoCard(
+      return _HeroCard(
+        shape: MaterialShapes.cookie6,
+        danger: true,
         icon: icon,
         title: title,
-        message: current.failure.message,
+        details: current.failure.message,
         action: TextButton(onPressed: onRetry, child: const Text('Réessayer')),
       );
     }
@@ -514,6 +551,7 @@ class _QuickAccess extends StatelessWidget {
       children: [
         Expanded(
           child: _QuickTile(
+            shape: MaterialShapes.cookie4,
             icon: Icons.calendar_month_rounded,
             label: 'Emploi du temps',
             background: scheme.primaryContainer,
@@ -524,6 +562,7 @@ class _QuickAccess extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _QuickTile(
+            shape: MaterialShapes.gem,
             icon: Icons.school_rounded,
             label: 'Mes notes',
             background: dark ? const Color(0xFF134E48) : const Color(0xFFCCF2EC),
@@ -538,6 +577,7 @@ class _QuickAccess extends StatelessWidget {
 
 class _QuickTile extends StatelessWidget {
   const _QuickTile({
+    required this.shape,
     required this.icon,
     required this.label,
     required this.background,
@@ -545,6 +585,7 @@ class _QuickTile extends StatelessWidget {
     required this.onTap,
   });
 
+  final MaterialShape shape;
   final IconData icon;
   final String label;
   final Color background;
@@ -561,13 +602,10 @@ class _QuickTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: background,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+              ShapeBadge(
+                shape: shape,
+                size: 52,
+                color: background,
                 child: Icon(icon, color: foreground),
               ),
               const SizedBox(height: 12),

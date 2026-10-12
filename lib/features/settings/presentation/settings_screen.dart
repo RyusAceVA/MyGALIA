@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/debug/debug_tools_screen.dart';
+import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
+import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
+import 'package:mygalia/core/presentation/widgets/profile_shape.dart';
 import 'package:mygalia/core/presentation/widgets/section_title.dart';
 import 'package:mygalia/core/settings/theme_mode_controller.dart';
 import 'package:mygalia/core/storage/cache_store.dart';
@@ -36,15 +39,7 @@ class SettingsScreen extends ConsumerWidget {
           Card(
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: CircleAvatar(
-                radius: 26,
-                backgroundColor: theme.colorScheme.secondaryContainer,
-                foregroundColor: theme.colorScheme.onSecondaryContainer,
-                child: Text(
-                  email.isEmpty ? '?' : email[0].toUpperCase(),
-                  style: theme.textTheme.titleLarge,
-                ),
-              ),
+              leading: ProfileShape(email: email, size: 52),
               title: const Text('Étudiant SC-Form'),
               subtitle: Text(email),
             ),
@@ -57,7 +52,23 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thème de l\'application', style: theme.textTheme.bodyLarge),
+                  Row(
+                    children: [
+                      _SettingShape(
+                        shape: MaterialShapes.sunny,
+                        icon: Icons.palette_outlined,
+                        fill: theme.colorScheme.tertiaryContainer,
+                        ink: theme.colorScheme.onTertiaryContainer,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          'Thème de l\'application',
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -96,14 +107,24 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.cleaning_services_outlined),
+                  leading: _SettingShape(
+                    shape: MaterialShapes.clover4,
+                    icon: Icons.cleaning_services_outlined,
+                    fill: theme.colorScheme.secondaryContainer,
+                    ink: theme.colorScheme.onSecondaryContainer,
+                  ),
                   title: const Text('Vider le cache local'),
                   subtitle: const Text('Planning et notes enregistrés'),
                   onTap: () => _clearCache(context, ref),
                 ),
                 const Divider(indent: 16, endIndent: 16),
                 ListTile(
-                  leading: Icon(Icons.logout_rounded, color: danger),
+                  leading: _SettingShape(
+                    shape: MaterialShapes.cookie4,
+                    icon: Icons.logout_rounded,
+                    fill: theme.colorScheme.errorContainer,
+                    ink: theme.colorScheme.onErrorContainer,
+                  ),
                   title: Text('Se déconnecter', style: TextStyle(color: danger)),
                   onTap: () => confirmSignOut(context, ref),
                 ),
@@ -116,7 +137,12 @@ class SettingsScreen extends ConsumerWidget {
             const SectionTitle('Diagnostic'),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.bug_report_outlined),
+                leading: _SettingShape(
+                  shape: MaterialShapes.gem,
+                  icon: Icons.bug_report_outlined,
+                  fill: theme.colorScheme.tertiaryContainer,
+                  ink: theme.colorScheme.onTertiaryContainer,
+                ),
                 title: const Text('Diagnostic (debug)'),
                 subtitle: const Text('Journal, invalider la session'),
                 onTap: () => Navigator.of(context).push(
@@ -144,4 +170,27 @@ class SettingsScreen extends ConsumerWidget {
       const SnackBar(content: Text('Cache local vidé.')),
     );
   }
+}
+
+/// Icône de réglage dans une petite forme Material 3 Expressive.
+class _SettingShape extends StatelessWidget {
+  const _SettingShape({
+    required this.shape,
+    required this.icon,
+    required this.fill,
+    required this.ink,
+  });
+
+  final MaterialShape shape;
+  final IconData icon;
+  final Color fill;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) => ShapeBadge(
+        shape: shape,
+        size: 40,
+        color: fill,
+        child: Icon(icon, size: 20, color: ink),
+      );
 }
