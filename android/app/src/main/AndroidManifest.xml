@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Indispensable en release : seuls les manifestes debug/profile la
+         déclarent par défaut. Sans elle, un APK release n'émet AUCUNE requête
+         réseau (échec systématique, « Réessayer » compris). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="mygalia"
         android:name="${applicationName}"
