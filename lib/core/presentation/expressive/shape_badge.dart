@@ -44,13 +44,19 @@ class _ShapeBadgeState extends State<ShapeBadge> with SingleTickerProviderStateM
   static final SpringDescription _spring =
       SpringDescription.withDampingRatio(mass: 1, stiffness: 380, ratio: 0.62);
 
-  late final AnimationController _morph = AnimationController.unbounded(vsync: this, value: 1);
+  late final AnimationController _morph;
 
   // État de départ de la transformation en cours.
   late List<double> _fromRadii = (widget.initialShape ?? widget.shape).radii;
   late Color _fromColor = widget.color;
   late double _fromRotation = widget.rotation;
   late bool _entrancePending = widget.initialShape != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _morph = AnimationController.unbounded(vsync: this, value: 1);
+  }
 
   @override
   void didChangeDependencies() {
