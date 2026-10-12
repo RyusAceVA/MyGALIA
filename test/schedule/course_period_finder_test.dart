@@ -94,6 +94,13 @@ void main() {
     expect(await finder.previousPeriodStart(_w(9)), _w(6));
   });
 
+  test('prochain jour de cours : ne saute pas la période en cours', () async {
+    // Vendredi de W6 (école) → lundi de W7, encore dans la même période.
+    expect(await finder.nextSchoolDay(_Plan.day(_w(6), 4)), _w(7));
+    // Depuis l'entreprise : premier jour d'école.
+    expect(await finder.nextSchoolDay(_w(1)), _w(3));
+  });
+
   test('rien trouvé : null, et pas plus de semaines chargées que la limite', () async {
     final _Plan companyOnly = _Plan();
     for (int w = 0; w < 30; w++) {

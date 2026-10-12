@@ -59,10 +59,32 @@ class PeriodJumpController extends Notifier<PeriodJumpDirection?> {
     return null;
   }
 
+  /// Saut au premier jour de la période de cours suivante / précédente.
   Future<PeriodJumpResult> jump({
     required DateTime from,
     required PeriodJumpDirection direction,
-  }) async {
+  }) =>
+      _search(
+        direction,
+        'saut de période (${direction.name}) depuis ${from.day}/${from.month}',
+        (CoursePeriodFinder finder) => direction == PeriodJumpDirection.next
+            ? finder.nextPeriodStart(from)
+            : finder.previousPeriodStart(from),
+      );
+
+  /// Premier jour de cours après [from], même dans la période en cours
+  /// (accueil : « Trouver les prochains cours »).
+  Future<PeriodJumpResult> nextCourseDay({required DateTime from}) => _search(
+        PeriodJumpDirection.next,
+        'recherche du prochain jour de cours depuis ${from.day}/${from.month}',
+        (CoursePeriodFinder finder) => finder.nextSchoolDay(from),
+      );
+
+  Future<PeriodJumpResult> _search(
+    PeriodJumpDirection direction,
+    String label,
+    Future<DateTime?> Function(CoursePeriodFinder finder) search,
+  ) async {
     if (state != null) {
       cancel();
       return const PeriodJumpCancelled();
@@ -70,14 +92,12 @@ class PeriodJumpController extends Notifier<PeriodJumpDirection?> {
     final CancelToken token = CancelToken();
     _token = token;
     state = direction;
-    AppLog.lifecycle('saut de période (${direction.name}) depuis ${from.day}/${from.month}');
+    AppLog.lifecycle(label);
     try {
       final ScheduleRepository repository = ref.read(scheduleRepositoryProvider);
       final CoursePeriodFinder finder =
           CoursePeriodFinder((DateTime monday) => _loadWeek(repository, monday, token));
-      final DateTime? day = direction == PeriodJumpDirection.next
-          ? await finder.nextPeriodStart(from)
-          : await finder.previousPeriodStart(from);
+      final DateTime? day = await search(finder);
       if (token.isCancelled) return const PeriodJumpCancelled();
       if (day == null) return const PeriodNotFound();
       ref.read(scheduleSelectedDayProvider.notifier).state = day;

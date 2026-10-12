@@ -133,12 +133,21 @@ Future<void> jumpToPeriod(
   WidgetRef ref, {
   required DateTime from,
   required PeriodJumpDirection direction,
+}) =>
+    announcePeriodSearch(
+      context,
+      ref.read(periodJumpControllerProvider.notifier).jump(from: from, direction: direction),
+      next: direction == PeriodJumpDirection.next,
+    );
+
+/// Annonce l'issue d'une recherche de cours (barre de notification).
+Future<void> announcePeriodSearch(
+  BuildContext context,
+  Future<PeriodJumpResult> search, {
+  required bool next,
 }) async {
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-  final PeriodJumpResult result = await ref
-      .read(periodJumpControllerProvider.notifier)
-      .jump(from: from, direction: direction);
-  final bool next = direction == PeriodJumpDirection.next;
+  final PeriodJumpResult result = await search;
   final String? message = switch (result) {
     PeriodFound(:final DateTime day) =>
       '${next ? 'Prochains cours' : 'Période précédente'} : ${DateFormatFr.dayInline(day)}',

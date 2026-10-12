@@ -21,6 +21,18 @@ class CoursePeriodFinder {
   final int maxWeeks;
   final Map<DateTime, WeekSchedule> _weeks = <DateTime, WeekSchedule>{};
 
+  /// Premier jour de cours strictement après [from] (même dans la période
+  /// en cours), ou `null` si aucun dans les [maxWeeks] semaines.
+  Future<DateTime?> nextSchoolDay(DateTime from) async {
+    final DateTime start = dateOnly(from);
+    final DateTime monday = mondayOf(start);
+    final DateTime limit = DateTime(monday.year, monday.month, monday.day + 7 * maxWeeks);
+    for (DateTime day = nextWeekday(start); day.isBefore(limit); day = nextWeekday(day)) {
+      if (await _kind(day) == DayKind.school) return day;
+    }
+    return null;
+  }
+
   /// Premier jour de la prochaine période de cours après [from] (si [from]
   /// est un jour de cours, la période en cours est d'abord dépassée), ou
   /// `null` si aucune dans les [maxWeeks] semaines.
