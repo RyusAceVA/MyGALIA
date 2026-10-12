@@ -1,0 +1,279 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:mygalia/core/debug/app_log.dart';
+import 'package:mygalia/core/network/failure.dart';
+import 'package:mygalia/core/network/retry_policy.dart';
+import 'package:mygalia/core/storage/secure_storage_service.dart';
+import 'package:mygalia/features/auth/data/auth_repository.dart';
+import 'package:mygalia/features/auth/data/edc_session_bootstrap.dart';
+import 'package:mygalia/features/auth/domain/edc_session.dart';
+
+/// Propriétaire unique de la session SC Form (jeton API + session école).
+///
+/// Garanties :
+///  * **une seule reconnexion à la fois** (« single flight ») : les requêtes
+///    qui échouent en même temps attendent la MÊME reconnexion, puis rejouent ;
+///  * une reconnexion repart TOUJOURS d'une session propre : l'ancien cookie
+///    jar, le segment `(S(…))` et le pkEntite sont jetés avant la poignée de
+///    main, qui crée un jar neuf ;
+///  * identifiants refusés (ou absents) → purge du coffre et événement
+///    [sessionLost] (retour à l'écran de connexion). AUCUNE autre erreur ne
+///    déconnecte l'utilisateur.
+class SessionManager {
+  SessionManager({
+    required SecureStorageService storage,
+    required AuthRepository auth,
+    required EdcSessionBootstrap bootstrap,
+    required RetryPolicy retry,
+    DateTime Function()? clock,
+  })  : _storage = storage,
+        _auth = auth,
+        _bootstrap = bootstrap,
+        _retry = retry,
+        _clock = clock ?? DateTime.now;
+
+  final SecureStorageService _storage;
+  final AuthRepository _auth;
+  final EdcSessionBootstrap _bootstrap;
+  final RetryPolicy _retry;
+  final DateTime Function() _clock;
+
+  final StreamController<Failure> _sessionLost =
+      StreamController<Failure>.broadcast();
+
+  EdcSession? _session;
+  ApiToken? _apiToken;
+  Future<void>? _restoring;
+  Future<EdcSession>? _renewal;
+  int _generation = 0;
+
+  /// Incrémenté à chaque [reset] : une opération lancée avant une
+  /// déconnexion ne peut plus enregistrer de session ensuite.
+  int _epoch = 0;
+  int _renewals = 0;
+
+  /// Émet quand l'utilisateur doit se reconnecter (identifiants refusés ou
+  /// absents du coffre).
+  Stream<Failure> get sessionLost => _sessionLost.stream;
+
+  /// Nombre de reconnexions effectuées (tests, diagnostic).
+  @visibleForTesting
+  int get renewalCount => _renewals;
+
+  /// Session école utilisable : mémoire, sinon coffre, sinon reconnexion.
+  Future<EdcSession> current() async {
+    await (_restoring ??= _restore());
+    final EdcSession? session = _session;
+    if (session != null) return session;
+    return renew();
+  }
+
+  /// Remplace la session de génération [staleGeneration], jugée invalide.
+  ///
+  /// Si une session plus récente existe déjà (une autre requête vient de la
+  /// renouveler), elle est rendue sans nouvelle reconnexion. Si une
+  /// reconnexion est en cours, son résultat est partagé.
+  Future<EdcSession> renew({int? staleGeneration}) {
+    final EdcSession? session = _session;
+    if (session != null &&
+        staleGeneration != null &&
+        session.generation > staleGeneration) {
+      AppLog.session(
+        'session déjà renouvelée (génération ${session.generation}) : '
+        'rejeu sans nouvelle reconnexion',
+      );
+      return Future<EdcSession>.value(session);
+    }
+    final Future<EdcSession>? inFlight = _renewal;
+    if (inFlight != null) {
+      AppLog.session('reconnexion déjà en cours : attente de son résultat');
+      return inFlight;
+    }
+    final Future<EdcSession> renewal = _runRenewal(_epoch);
+    _renewal = renewal;
+    return renewal;
+  }
+
+  /// Persiste les cookies reçus en cours de route (ex. `ASP.NET_SessionId`
+  /// de PlanningWeb), si [session] est toujours la session courante.
+  Future<void> persistIfCurrent(EdcSession session) async {
+    if (!identical(session, _session)) return;
+    await _persist(session);
+  }
+
+  /// Oublie tout (déconnexion, nouvelle connexion). Les opérations en cours
+  /// ne pourront plus enregistrer leur résultat.
+  void reset() {
+    _epoch++;
+    _session = null;
+    _apiToken = null;
+    _renewal = null;
+    _restoring = null;
+    AppLog.session('session réinitialisée');
+  }
+
+  void dispose() {
+    _sessionLost.close();
+  }
+
+  Future<void> _restore() async {
+    final int epoch = _epoch;
+    final Map<String, Object?>? json = await _storage.readEdcSession();
+    if (json == null || epoch != _epoch || _session != null) return;
+    final EdcSession? restored = EdcSession.tryFromJson(json);
+    if (restored == null) {
+      AppLog.session('session école stockée illisible : supprimée');
+      await _storage.deleteEdcSession();
+      return;
+    }
+    _session = restored;
+    _generation = max(_generation, restored.generation);
+    AppLog.session(
+      'session école restaurée depuis le coffre '
+      '(génération ${restored.generation})',
+    );
+  }
+
+  Future<EdcSession> _runRenewal(int epoch) async {
+    try {
+      return await _renewOnce(epoch);
+    } finally {
+      // Une reconnexion terminée (succès ou échec) libère la place : rien ne
+      // peut rester bloqué sur un ancien Future.
+      if (epoch == _epoch) _renewal = null;
+    }
+  }
+
+  Future<EdcSession> _renewOnce(int epoch) async {
+    final int generation = ++_generation;
+    _renewals++;
+    AppLog.session('reconnexion silencieuse (génération $generation)…');
+
+    // Repartir d'une session propre : l'ancienne n'est plus utilisable.
+    _session = null;
+    await _storage.deleteEdcSession();
+
+    try {
+      final Credentials? credentials = await _storage.readCredentials();
+      if (credentials == null) throw const SignedOutFailure();
+
+      ApiToken token = await _usableApiToken(credentials, epoch);
+      EdcSession session;
+      try {
+        session = await _retry.run(
+          'poignée de main EDC',
+          () => _handshake(credentials, token, generation),
+        );
+      } on ApiTokenRejected catch (rejected) {
+        AppLog.session(
+          'jeton API refusé (HTTP ${rejected.status}) : nouvelle connexion API',
+        );
+        _apiToken = null;
+        await _storage.deleteApiToken();
+        token = await _loginAndStore(credentials, epoch);
+        try {
+          session = await _retry.run(
+            'poignée de main EDC',
+            () => _handshake(credentials, token, generation),
+          );
+        } on ApiTokenRejected {
+          throw const SessionFailure(
+            'SC Form refuse le jeton de connexion qu\'il vient de délivrer. '
+            'Réessayez plus tard.',
+          );
+        }
+      }
+
+      _ensureEpoch(epoch);
+      _session = session;
+      await _persist(session);
+      AppLog.session('reconnexion réussie (génération $generation)');
+      return session;
+    } on InvalidCredentialsFailure catch (failure) {
+      await _loseSession(epoch, failure);
+      rethrow;
+    } on SignedOutFailure catch (failure) {
+      await _loseSession(epoch, failure);
+      rethrow;
+    }
+  }
+
+  Future<EdcSession> _handshake(
+    Credentials credentials,
+    ApiToken token,
+    int generation,
+  ) async {
+    final String transition = await _auth.getEdcTransitionToken(
+      email: credentials.email,
+      token: token,
+    );
+    return _bootstrap.open(
+      email: credentials.email,
+      transitionToken: transition,
+      generation: generation,
+    );
+  }
+
+  Future<ApiToken> _usableApiToken(Credentials credentials, int epoch) async {
+    final ApiToken? token = _apiToken ?? await _storage.readApiToken();
+    if (token != null && token.isUsable(_clock())) {
+      _apiToken = token;
+      return token;
+    }
+    AppLog.session(
+      token == null ? 'aucun jeton API : connexion' : 'jeton API expiré : connexion',
+    );
+    return _loginAndStore(credentials, epoch);
+  }
+
+  Future<ApiToken> _loginAndStore(Credentials credentials, int epoch) async {
+    final ApiToken token = await _auth.login(credentials);
+    _ensureEpoch(epoch);
+    _apiToken = token;
+    try {
+      await _storage.saveApiToken(token);
+    } on CacheFailure {
+      AppLog.error('jeton API non persisté (coffre indisponible)');
+    }
+    return token;
+  }
+
+  Future<void> _persist(EdcSession session) async {
+    try {
+      await _storage.saveEdcSession(session.toJson());
+    } on CacheFailure {
+      // La session reste utilisable en mémoire.
+      AppLog.error('session école non persistée (coffre indisponible)');
+    }
+  }
+
+  Future<void> _loseSession(int epoch, Failure failure) async {
+    if (epoch != _epoch) return;
+    AppLog.auth(
+      'reconnexion impossible (${failure.runtimeType}) : retour à l\'écran '
+      'de connexion',
+    );
+    _apiToken = null;
+    await _storage.clearAll();
+    if (!_sessionLost.isClosed) _sessionLost.add(failure);
+  }
+
+  void _ensureEpoch(int epoch) {
+    if (epoch != _epoch) throw const CancelledFailure();
+  }
+}
+
+final sessionManagerProvider = Provider<SessionManager>((ref) {
+  final SessionManager manager = SessionManager(
+    storage: ref.watch(secureStorageServiceProvider),
+    auth: ref.watch(authRepositoryProvider),
+    bootstrap: ref.watch(edcSessionBootstrapProvider),
+    retry: ref.watch(retryPolicyProvider),
+  );
+  ref.onDispose(manager.dispose);
+  return manager;
+});
