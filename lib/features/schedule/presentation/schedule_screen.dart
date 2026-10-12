@@ -413,8 +413,10 @@ class _JumpButton extends StatelessWidget {
       icon: searching
           ? const ExpressiveLoadingIndicator(size: 22, semanticsLabel: 'Recherche en cours')
           : Icon(icon),
+      // L'indicateur à formes dit « recherche en cours » ; le libellé
+      // dit ce que fait l'appui, sans être tronqué sur un petit écran.
       label: Text(
-        searching ? 'Recherche… (annuler)' : label,
+        searching ? 'Annuler' : label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

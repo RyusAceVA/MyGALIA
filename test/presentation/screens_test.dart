@@ -12,6 +12,7 @@ import 'package:mygalia/features/grades/domain/grade.dart';
 import 'package:mygalia/features/grades/presentation/grades_controller.dart';
 import 'package:mygalia/features/grades/presentation/grades_screen.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
+import 'package:mygalia/features/schedule/presentation/period_jump_controller.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_controller.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_screen.dart';
 
@@ -52,6 +53,12 @@ class _FakeGradesControllerByPeriod extends GradesController {
 
   @override
   Future<void> refresh() async {}
+}
+
+/// Recherche de la période suivante en cours.
+class _SearchingJump extends PeriodJumpController {
+  @override
+  PeriodJumpDirection? build() => PeriodJumpDirection.next;
 }
 
 final DateTime _monday = DateTime(2026, 10, 12);
@@ -113,6 +120,20 @@ void main() {
     expect(find.byType(ExpressiveLoadingIndicator), findsOneWidget);
     expect(find.text('COURS LUN'), findsOneWidget, reason: 'les données restent affichées');
     expect(find.byType(WavyLinearProgressIndicator), findsNothing, reason: 'pas de recherche');
+  });
+
+  testWidgets('planning : recherche en cours — vague, formes et bouton « Annuler »', (tester) async {
+    await _pump(tester, const ScheduleScreen(), [
+      ..._schedule(DataSuccess<WeekSchedule>(_week(), DateTime.now())),
+      periodJumpControllerProvider.overrideWith(_SearchingJump.new),
+    ]);
+
+    expect(find.text('Annuler'), findsOneWidget);
+    expect(find.text('Prochains cours'), findsNothing);
+    expect(find.text('Cours précédents'), findsOneWidget);
+    expect(find.byType(WavyLinearProgressIndicator), findsOneWidget);
+    // Libellé fusionné dans celui du bouton.
+    expect(find.bySemanticsLabel(RegExp('Recherche en cours')), findsOneWidget);
   });
 
   testWidgets('planning : toucher un jour de la bande affiche ses séances', (tester) async {
