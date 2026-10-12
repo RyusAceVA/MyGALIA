@@ -36,6 +36,10 @@ class FakeScFormServer {
   /// Retard de GetToken : élargit la fenêtre de concurrence des tests.
   Duration getTokenDelay = Duration.zero;
 
+  /// Expire la session école juste après le prochain GET des notes (donc
+  /// avant le postback qui suit).
+  bool expireAfterNextNotesGet = false;
+
   // --- Compteurs ----------------------------------------------------------------
   int loginCalls = 0;
   int getTokenCalls = 0;
@@ -199,16 +203,21 @@ class FakeScFormServer {
         ..add('set-cookie', 'ASP.NET_SessionId=sid$_counter; path=/; HttpOnly');
       return _redirect(res, '/GaliaEDC/$segment/Accueil/Stagiaire.aspx');
     }
+    // Les compteurs comptent les TENTATIVES, acceptées ou non.
+    if (rest == ScFormConfig.mesNotesPath && req.method == 'GET') notesGetCalls++;
+    if (rest == ScFormConfig.mesNotesPath && req.method == 'POST') notesPostCalls++;
     if (!_authorized(req) || segment != _validSegment) return _expired(res);
     if (rest == '/Accueil/Stagiaire.aspx') {
       return _html(res, stagiaireHtml(planningId));
     }
     if (rest == ScFormConfig.mesNotesPath && req.method == 'GET') {
-      notesGetCalls++;
+      if (expireAfterNextNotesGet) {
+        expireAfterNextNotesGet = false;
+        expireSchoolSession();
+      }
       return _html(res, notesPageHtml(period: '30'));
     }
     if (rest == ScFormConfig.mesNotesPath && req.method == 'POST') {
-      notesPostCalls++;
       final Map<String, String> form =
           Uri.splitQueryString(await utf8.decodeStream(req));
       final bool valid =

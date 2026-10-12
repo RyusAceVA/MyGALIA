@@ -1,0 +1,105 @@
+import 'package:flutter/foundation.dart';
+
+/// Une note (§4.1 a de la rétro-ingénierie).
+@immutable
+class Grade {
+  const Grade({
+    required this.value,
+    required this.coefficient,
+    required this.subject,
+    this.outOf = 20,
+    this.date,
+    this.type,
+  });
+
+  final double value;
+  final double outOf;
+  final double coefficient;
+  final String subject;
+  final DateTime? date;
+
+  /// Nature de l'évaluation (« Devoir surveillé », « Oral »…).
+  final String? type;
+
+  Map<String, Object?> toJson() => {
+        'value': value,
+        'outOf': outOf,
+        'coefficient': coefficient,
+        'subject': subject,
+        'date': date?.toIso8601String(),
+        'type': type,
+      };
+
+  /// Lève une erreur si le contenu est incomplet (cache corrompu).
+  static Grade fromJson(Map<String, Object?> json) {
+    final Object? date = json['date'];
+    return Grade(
+      value: (json['value']! as num).toDouble(),
+      outOf: (json['outOf']! as num).toDouble(),
+      coefficient: (json['coefficient']! as num).toDouble(),
+      subject: json['subject']! as String,
+      date: date is String ? DateTime.parse(date) : null,
+      type: json['type'] as String?,
+    );
+  }
+}
+
+/// Un semestre proposé par le sélecteur de période (§4.1 b).
+@immutable
+class SchoolPeriod {
+  const SchoolPeriod({required this.value, required this.label});
+
+  /// Valeur WebForms (ex. « 30 », « 31 »).
+  final String value;
+
+  /// Libellé affiché (« SEMESTRE 1 (du 16/09/2024 au 19/09/2025) »).
+  final String label;
+
+  Map<String, Object?> toJson() => {'value': value, 'label': label};
+
+  static SchoolPeriod fromJson(Map<String, Object?> json) => SchoolPeriod(
+        value: json['value']! as String,
+        label: json['label']! as String,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SchoolPeriod && other.value == value && other.label == label;
+
+  @override
+  int get hashCode => Object.hash(value, label);
+}
+
+/// Notes d'un semestre et semestres disponibles.
+@immutable
+class GradesSnapshot {
+  const GradesSnapshot({
+    required this.periods,
+    required this.selectedPeriod,
+    required this.grades,
+  });
+
+  final List<SchoolPeriod> periods;
+
+  /// Valeur du semestre affiché (`null` si la page n'a pas de sélecteur).
+  final String? selectedPeriod;
+  final List<Grade> grades;
+
+  Map<String, Object?> toJson() => {
+        'periods': [for (final SchoolPeriod p in periods) p.toJson()],
+        'selectedPeriod': selectedPeriod,
+        'grades': [for (final Grade g in grades) g.toJson()],
+      };
+
+  static GradesSnapshot fromJson(Map<String, Object?> json) => GradesSnapshot(
+        periods: [
+          for (final Object? p in json['periods']! as List<Object?>)
+            SchoolPeriod.fromJson((p! as Map<Object?, Object?>).cast<String, Object?>()),
+        ],
+        selectedPeriod: json['selectedPeriod'] as String?,
+        grades: [
+          for (final Object? g in json['grades']! as List<Object?>)
+            Grade.fromJson((g! as Map<Object?, Object?>).cast<String, Object?>()),
+        ],
+      );
+}
