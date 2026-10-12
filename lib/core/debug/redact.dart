@@ -60,10 +60,23 @@ abstract final class Redact {
           .map((MapEntry<String, List<String>> e) =>
               _sensitiveParams.contains(e.key.toLowerCase())
                   ? '${e.key}=$mask'
-                  : '${e.key}=${e.value.join(',')}')
+                  : '${e.key}=${e.value.map(_value).join(',')}')
           .join('&');
     } on FormatException {
       return mask;
     }
+  }
+
+  /// Paramètre sensible à l'intérieur d'une valeur (URL imbriquée).
+  static final RegExp _nestedSensitive = RegExp(
+    r'(?:^|[?&;])(?:email|emailscco|tokenscco|token|password|localid)=',
+    caseSensitive: false,
+  );
+
+  /// Une valeur peut elle-même être une URL (ex. `ReturnUrl`) portant un
+  /// segment de session ou des paramètres sensibles : ils sont masqués aussi.
+  static String _value(String value) {
+    if (_nestedSensitive.hasMatch(value)) return mask;
+    return value.replaceAll(_sessionSegment, '(S($mask))');
   }
 }

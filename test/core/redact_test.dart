@@ -48,6 +48,23 @@ void main() {
     });
   });
 
+  test('URL imbriquée (ReturnUrl) : segment et paramètres sensibles masqués', () {
+    final Uri withSegment = Uri.parse(
+      'https://expernet.sc-form.net/GaliaEDC/Login.aspx'
+      '?ReturnUrl=%2fGaliaEDC%2f(S(abcdefsecret))%2fEleve%2fMesNotes.aspx',
+    );
+    final Uri withToken = Uri.parse(
+      'https://expernet.sc-form.net/GaliaEDC/Login.aspx?ReturnUrl='
+      '${Uri.encodeQueryComponent('/GaliaEDC/Default.aspx?emailscco=a.b@c.fr&tokenscco=jetonsecret')}',
+    );
+
+    expect(Redact.uri(withSegment), isNot(contains('abcdefsecret')));
+    expect(Redact.uri(withSegment), contains('(S(•••))'));
+    expect(Redact.uri(withToken), isNot(contains('jetonsecret')));
+    expect(Redact.uri(withToken), isNot(contains('a.b@c.fr')));
+    expect(Redact.uri(withToken), contains('ReturnUrl=•••'));
+  });
+
   test('Redact.location résout une redirection relative et la masque', () {
     final Uri base = Uri.parse('https://expernet.sc-form.net/GaliaEDC/Default.aspx');
 
