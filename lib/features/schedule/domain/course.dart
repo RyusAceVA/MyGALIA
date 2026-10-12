@@ -19,8 +19,18 @@ class Course {
   final String? teachers;
   final String? room;
 
+  static final RegExp _companyPresence = RegExp(
+    r'pr[éeÉE]sence\s+en\s+entreprise',
+    caseSensitive: false,
+  );
+
   /// Jour de la séance (minuit, heure locale).
   DateTime get day => DateTime(start.year, start.month, start.day);
+
+  /// Présence en entreprise (alternance) : pas un cours à l'école.
+  bool get isCompanyPresence => <String?>[subject, group, teachers, room]
+      .whereType<String>()
+      .any(_companyPresence.hasMatch);
 
   Map<String, Object?> toJson() => {
         'start': start.toIso8601String(),
@@ -83,7 +93,59 @@ class WeekSchedule {
       );
 }
 
+/// Premier vrai cours (hors présence en entreprise) qui commence après
+/// [instant] dans la semaine, ou `null`.
+Course? firstSchoolCourseAfter(WeekSchedule week, DateTime instant) => week.courses
+    .where((Course c) => !c.isCompanyPresence && c.start.isAfter(instant))
+    .firstOrNull;
+
+/// Nature d'un jour ouvré, du point de vue de l'alternance.
+enum DayKind {
+  /// Au moins un vrai cours à l'école.
+  school,
+
+  /// Uniquement de la présence en entreprise.
+  company,
+
+  /// Rien de prévu (vacances, jour libre).
+  empty,
+}
+
+DayKind dayKindOf(Iterable<Course> courses) {
+  bool company = false;
+  for (final Course course in courses) {
+    if (!course.isCompanyPresence) return DayKind.school;
+    company = true;
+  }
+  return company ? DayKind.company : DayKind.empty;
+}
+
 /// Lundi de la semaine de [date]. Calcul calendaire (et non par soustraction
 /// de durées) : insensible aux changements d'heure.
 DateTime mondayOf(DateTime date) =>
     DateTime(date.year, date.month, date.day - (date.weekday - 1));
+
+/// [date] à minuit.
+DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// [date] si c'est un jour ouvré, sinon le lundi suivant.
+DateTime weekdayOnOrAfter(DateTime date) {
+  DateTime day = dateOnly(date);
+  while (day.weekday > DateTime.friday) {
+    day = DateTime(day.year, day.month, day.day + 1);
+  }
+  return day;
+}
+
+/// Jour ouvré suivant (le vendredi mène au lundi).
+DateTime nextWeekday(DateTime date) =>
+    weekdayOnOrAfter(DateTime(date.year, date.month, date.day + 1));
+
+/// Jour ouvré précédent (le lundi mène au vendredi).
+DateTime previousWeekday(DateTime date) {
+  DateTime day = DateTime(date.year, date.month, date.day - 1);
+  while (day.weekday > DateTime.friday) {
+    day = DateTime(day.year, day.month, day.day - 1);
+  }
+  return day;
+}

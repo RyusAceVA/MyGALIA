@@ -5,73 +5,157 @@ import 'package:mygalia/core/presentation/data_state.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
+import 'package:mygalia/features/schedule/presentation/period_jump_controller.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_controller.dart';
+import 'package:mygalia/features/schedule/presentation/widgets/course_tile.dart';
 
-/// Emploi du temps de la semaine, avec pull-to-refresh.
+/// Emploi du temps : semaine, bande des jours, séances du jour choisi,
+/// saut de période de cours en période de cours, pull-to-refresh.
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key, this.actions = const <Widget>[]});
 
-  /// Actions supplémentaires de la barre d'application (menu du compte).
+  /// Actions supplémentaires de la barre d'application.
   final List<Widget> actions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final DateTime monday = ref.watch(scheduleWeekProvider);
-    final DataState<WeekSchedule> state =
-        ref.watch(scheduleControllerProvider(monday));
+    final DateTime selected = ref.watch(scheduleSelectedDayProvider);
+    final DateTime monday = mondayOf(selected);
+    final DataState<WeekSchedule> state = ref.watch(scheduleControllerProvider(monday));
     final ScheduleController controller =
         ref.read(scheduleControllerProvider(monday).notifier);
-    final DateTime thisWeek = mondayOf(DateTime.now());
+    final PeriodJumpDirection? searching = ref.watch(periodJumpControllerProvider);
 
-    void showWeek(DateTime target) =>
-        ref.read(scheduleWeekProvider.notifier).state = target;
+    void select(DateTime day) =>
+        ref.read(scheduleSelectedDayProvider.notifier).state = weekdayOnOrAfter(day);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emploi du temps'),
         actions: [
-          if (monday != thisWeek)
-            IconButton(
-              tooltip: 'Revenir à cette semaine',
-              icon: const Icon(Icons.today_outlined),
-              onPressed: () => showWeek(thisWeek),
-            ),
+          IconButton(
+            tooltip: 'Choisir une date',
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: () => _pickDate(context, selected, select),
+          ),
+          IconButton(
+            tooltip: 'Aujourd\'hui',
+            icon: const Icon(Icons.today_outlined),
+            onPressed: () => select(DateTime.now()),
+          ),
           ...actions,
         ],
       ),
       body: Column(
         children: [
-          _WeekBar(
+          _WeekHeader(
             monday: monday,
             onPrevious: () =>
-                showWeek(DateTime(monday.year, monday.month, monday.day - 7)),
+                select(DateTime(selected.year, selected.month, selected.day - 7)),
             onNext: () =>
-                showWeek(DateTime(monday.year, monday.month, monday.day + 7)),
+                select(DateTime(selected.year, selected.month, selected.day + 7)),
           ),
-          RefreshProgress(visible: state.isRefreshing),
+          _DayStrip(
+            monday: monday,
+            selected: selected,
+            week: state.data,
+            onSelected: select,
+          ),
+          _PeriodJumpBar(
+            searching: searching,
+            onJump: (PeriodJumpDirection direction) =>
+                jumpToPeriod(context, ref, from: selected, direction: direction),
+          ),
+          RefreshProgress(visible: state.isRefreshing || searching != null),
           Expanded(
-            child: DataStateView<WeekSchedule>(
-              state: state,
-              onRefresh: controller.refresh,
-              builder: (BuildContext context, WeekSchedule week) => [
-                for (int i = 0; i < 5; i++)
-                  _DaySection(
-                    day: DateTime(monday.year, monday.month, monday.day + i),
-                    courses: week.coursesOn(
-                      DateTime(monday.year, monday.month, monday.day + i),
-                    ),
-                  ),
-              ],
+            // Balayer horizontalement change de jour (et de semaine aux bords).
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (DragEndDetails details) {
+                final double velocity = details.primaryVelocity ?? 0;
+                if (velocity < -250) select(nextWeekday(selected));
+                if (velocity > 250) select(previousWeekday(selected));
+              },
+              child: DataStateView<WeekSchedule>(
+                state: state,
+                onRefresh: controller.refresh,
+                builder: (BuildContext context, WeekSchedule week) =>
+                    _dayContent(week, selected, select),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  static List<Widget> _dayContent(
+    WeekSchedule week,
+    DateTime day,
+    ValueChanged<DateTime> select,
+  ) {
+    final List<Course> courses = week.coursesOn(day);
+    if (courses.isEmpty) {
+      final DateTime endOfDay = DateTime(day.year, day.month, day.day + 1);
+      return [
+        _EmptyDay(next: firstSchoolCourseAfter(week, endOfDay), onShow: select),
+      ];
+    }
+    return [
+      for (final Course course in courses)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CourseTile(course: course),
+        ),
+    ];
+  }
+
+  static Future<void> _pickDate(
+    BuildContext context,
+    DateTime initial,
+    ValueChanged<DateTime> select,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(initial.year - 2),
+      lastDate: DateTime(initial.year + 2, 12, 31),
+      selectableDayPredicate: (DateTime day) => day.weekday <= DateTime.friday,
+      helpText: 'Aller au jour',
+    );
+    if (picked != null) select(picked);
+  }
 }
 
-class _WeekBar extends StatelessWidget {
-  const _WeekBar({
+/// Lance un saut de période et en annonce l'issue (barre de notification).
+Future<void> jumpToPeriod(
+  BuildContext context,
+  WidgetRef ref, {
+  required DateTime from,
+  required PeriodJumpDirection direction,
+}) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final PeriodJumpResult result = await ref
+      .read(periodJumpControllerProvider.notifier)
+      .jump(from: from, direction: direction);
+  final bool next = direction == PeriodJumpDirection.next;
+  final String? message = switch (result) {
+    PeriodFound(:final DateTime day) =>
+      '${next ? 'Prochains cours' : 'Période précédente'} : ${DateFormatFr.dayInline(day)}',
+    PeriodNotFound() => next
+        ? 'Aucun cours trouvé dans les 12 prochaines semaines.'
+        : 'Aucun cours trouvé dans les 12 semaines précédentes.',
+    PeriodJumpFailed(:final failure) => failure.message,
+    PeriodJumpCancelled() => null,
+  };
+  if (message == null) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+class _WeekHeader extends StatelessWidget {
+  const _WeekHeader({
     required this.monday,
     required this.onPrevious,
     required this.onNext,
@@ -94,9 +178,9 @@ class _WeekBar extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              'Semaine ${DateFormatFr.weekRange(monday)}',
+              DateFormatFr.weekRangeShort(monday),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall,
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
           IconButton(
@@ -110,148 +194,244 @@ class _WeekBar extends StatelessWidget {
   }
 }
 
-class _DaySection extends StatelessWidget {
-  const _DaySection({required this.day, required this.courses});
+class _DayStrip extends StatelessWidget {
+  const _DayStrip({
+    required this.monday,
+    required this.selected,
+    required this.week,
+    required this.onSelected,
+  });
 
-  final DateTime day;
-  final List<Course> courses;
+  final DateTime monday;
+  final DateTime selected;
+  final WeekSchedule? week;
+  final ValueChanged<DateTime> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final DateTime now = DateTime.now();
-    final bool isToday =
-        day.year == now.year && day.month == now.month && day.day == now.day;
+    final DateTime today = dateOnly(DateTime.now());
+    final WeekSchedule? data = week;
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Row(
         children: [
-          Text(
-            isToday ? '${DateFormatFr.dayLong(day)} · aujourd\'hui' : DateFormatFr.dayLong(day),
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: isToday ? theme.colorScheme.primary : null,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (courses.isEmpty)
-            Text(
-              'Pas de cours',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            )
-          else
-            for (final Course course in courses)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _CourseCard(course: course),
+          for (int i = 0; i < 5; i++)
+            Expanded(
+              child: _DayChip(
+                day: DateTime(monday.year, monday.month, monday.day + i),
+                selected: DateTime(monday.year, monday.month, monday.day + i) == selected,
+                isToday: DateTime(monday.year, monday.month, monday.day + i) == today,
+                kind: data == null
+                    ? null
+                    : dayKindOf(data.coursesOn(DateTime(monday.year, monday.month, monday.day + i))),
+                onTap: onSelected,
               ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _CourseCard extends StatelessWidget {
-  const _CourseCard({required this.course});
+class _DayChip extends StatelessWidget {
+  const _DayChip({
+    required this.day,
+    required this.selected,
+    required this.isToday,
+    required this.kind,
+    required this.onTap,
+  });
 
-  final Course course;
+  final DateTime day;
+  final bool selected;
+  final bool isToday;
+  final DayKind? kind;
+  final ValueChanged<DateTime> onTap;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final Color muted = theme.colorScheme.onSurfaceVariant;
-    final String? teachers = course.teachers;
-    final String? room = course.room;
-    final String? group = course.group;
-    return Card(
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(width: 6, color: subjectColor(course.subject)),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${DateFormatFr.time(course.start)} – ${DateFormatFr.time(course.end)}',
-                      style: theme.textTheme.labelLarge?.copyWith(color: muted),
+    final ColorScheme scheme = theme.colorScheme;
+    final Color foreground = selected
+        ? scheme.onSecondaryContainer
+        : (isToday ? scheme.primary : scheme.onSurface);
+    const BorderRadius radius = BorderRadius.all(Radius.circular(18));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: DateFormatFr.dayLong(day),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? scheme.secondaryContainer : scheme.secondaryContainer.withValues(alpha: 0),
+            borderRadius: radius,
+          ),
+          child: InkWell(
+            borderRadius: radius,
+            onTap: () => onTap(day),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormatFr.weekdayShort(day),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: selected || isToday ? foreground : scheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      course.subject,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${day.day}',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: foreground,
+                      fontWeight: selected || isToday ? FontWeight.w700 : FontWeight.w500,
                     ),
-                    if (teachers != null) ...[
-                      const SizedBox(height: 2),
-                      Text(teachers, style: theme.textTheme.bodyMedium),
-                    ],
-                    if (room != null || group != null) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 4,
-                        children: [
-                          if (room != null) _Tag(icon: Icons.place_outlined, text: room),
-                          if (group != null) _Tag(icon: Icons.groups_outlined, text: group),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 4),
+                  _KindMarker(kind: kind, color: foreground),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({required this.icon, required this.text});
+/// Point sous un jour de cours, petit losange creux pour l'entreprise.
+class _KindMarker extends StatelessWidget {
+  const _KindMarker({required this.kind, required this.color});
 
-  final IconData icon;
-  final String text;
+  final DayKind? kind;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final Color muted = theme.colorScheme.onSurfaceVariant;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: muted),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
-        ),
-      ],
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 8,
+      child: switch (kind) {
+        DayKind.school => Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+        DayKind.company => Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: scheme.outline, width: 1.2),
+            ),
+          ),
+        DayKind.empty || null => const SizedBox(width: 6),
+      },
     );
   }
 }
 
-/// Couleur stable d'une matière, dérivée de son libellé (les données réelles
-/// n'en fournissent pas, §3.3).
-Color subjectColor(String subject) {
-  const List<Color> palette = [
-    Color(0xFF6366F1),
-    Color(0xFF0EA5E9),
-    Color(0xFF10B981),
-    Color(0xFFF59E0B),
-    Color(0xFFEF4444),
-    Color(0xFF8B5CF6),
-    Color(0xFFEC4899),
-    Color(0xFF14B8A6),
-  ];
-  int hash = 0;
-  for (final int unit in subject.codeUnits) {
-    hash = (hash * 31 + unit) & 0x7fffffff;
+class _PeriodJumpBar extends StatelessWidget {
+  const _PeriodJumpBar({required this.searching, required this.onJump});
+
+  final PeriodJumpDirection? searching;
+  final ValueChanged<PeriodJumpDirection> onJump;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          _JumpButton(
+            label: 'Cours précédents',
+            icon: Icons.skip_previous_rounded,
+            iconAtEnd: false,
+            searching: searching == PeriodJumpDirection.previous,
+            onPressed: searching == PeriodJumpDirection.next
+                ? null
+                : () => onJump(PeriodJumpDirection.previous),
+          ),
+          const Spacer(),
+          _JumpButton(
+            label: 'Prochains cours',
+            icon: Icons.skip_next_rounded,
+            iconAtEnd: true,
+            searching: searching == PeriodJumpDirection.next,
+            onPressed: searching == PeriodJumpDirection.previous
+                ? null
+                : () => onJump(PeriodJumpDirection.next),
+          ),
+        ],
+      ),
+    );
   }
-  return palette[hash % palette.length];
+}
+
+class _JumpButton extends StatelessWidget {
+  const _JumpButton({
+    required this.label,
+    required this.icon,
+    required this.iconAtEnd,
+    required this.searching,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool iconAtEnd;
+  final bool searching;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      iconAlignment: iconAtEnd ? IconAlignment.end : IconAlignment.start,
+      icon: searching
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon),
+      label: Text(searching ? 'Recherche… (annuler)' : label),
+    );
+  }
+}
+
+class _EmptyDay extends StatelessWidget {
+  const _EmptyDay({required this.next, required this.onShow});
+
+  final Course? next;
+  final ValueChanged<DateTime> onShow;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final Course? upcoming = next;
+    return Padding(
+      padding: const EdgeInsets.only(top: 72),
+      child: Column(
+        children: [
+          Icon(Icons.event_available_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(height: 12),
+          Text('Pas de cours ce jour', style: theme.textTheme.titleMedium),
+          if (upcoming != null) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => onShow(upcoming.day),
+              child: Text(
+                'Prochain cours : ${DateFormatFr.dayInline(upcoming.start)} '
+                'à ${DateFormatFr.time(upcoming.start)}',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

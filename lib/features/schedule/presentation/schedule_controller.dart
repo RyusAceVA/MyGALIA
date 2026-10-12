@@ -7,9 +7,10 @@ import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/features/schedule/data/schedule_repository.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
 
-/// Lundi de la semaine affichée (flèches ‹ › et « cette semaine »).
-final scheduleWeekProvider = StateProvider.autoDispose<DateTime>((ref) {
-  return mondayOf(DateTime.now());
+/// Jour affiché dans l'emploi du temps (toujours un jour ouvré). La semaine
+/// chargée est celle de ce jour.
+final scheduleSelectedDayProvider = StateProvider<DateTime>((ref) {
+  return weekdayOnOrAfter(DateTime.now());
 });
 
 /// Un contrôleur par semaine : changer de semaine ne mélange jamais les

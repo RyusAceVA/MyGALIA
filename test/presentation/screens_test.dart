@@ -50,23 +50,30 @@ class _FakeGradesControllerByPeriod extends GradesController {
   Future<void> refresh() async {}
 }
 
-WeekSchedule _week() {
-  final DateTime monday = mondayOf(DateTime.now());
-  return WeekSchedule(
-    monday: monday,
-    courses: [
-      for (int i = 0; i < 5; i++)
-        Course(
-          start: DateTime(monday.year, monday.month, monday.day + i, 8, 30),
-          end: DateTime(monday.year, monday.month, monday.day + i, 12),
-          subject: 'DEVELOPPEMENT WEB',
-          group: 'TSRS1',
-          teachers: 'DEWOLF GIAMMATTEI François',
-          room: 'PITON FOURNAISE',
-        ),
-    ],
-  );
-}
+final DateTime _monday = DateTime(2026, 10, 12);
+const List<String> _subjects = ['COURS LUN', 'COURS MAR', 'COURS MER', 'COURS JEU', 'COURS VEN'];
+
+WeekSchedule _week({Set<int> emptyDays = const <int>{}}) => WeekSchedule(
+      monday: _monday,
+      courses: [
+        for (int i = 0; i < 5; i++)
+          if (!emptyDays.contains(i))
+            Course(
+              start: DateTime(_monday.year, _monday.month, _monday.day + i, 8, 30),
+              end: DateTime(_monday.year, _monday.month, _monday.day + i, 12),
+              subject: _subjects[i],
+              group: 'TSRS1',
+              teachers: 'DEWOLF GIAMMATTEI François',
+              room: 'PITON FOURNAISE',
+            ),
+      ],
+    );
+
+/// Planning de la semaine du 12/10/2026, jour choisi : lundi.
+List<Override> _schedule(DataState<WeekSchedule> state, {_FakeScheduleController? fake}) => [
+      scheduleSelectedDayProvider.overrideWith((ref) => _monday),
+      scheduleControllerProvider.overrideWith(() => fake ?? _FakeScheduleController(state)),
+    ];
 
 Future<void> _pump(WidgetTester tester, Widget screen, List<Override> overrides) async {
   await tester.pumpWidget(
@@ -76,24 +83,53 @@ Future<void> _pump(WidgetTester tester, Widget screen, List<Override> overrides)
 }
 
 void main() {
-  testWidgets('planning : séances, date de mise à jour', (tester) async {
-    await _pump(tester, const ScheduleScreen(), [
-      scheduleControllerProvider.overrideWith(
-        () => _FakeScheduleController(DataSuccess<WeekSchedule>(_week(), DateTime.now())),
-      ),
-    ]);
+  testWidgets('planning : séances du jour choisi seulement, date de mise à jour', (tester) async {
+    await _pump(
+      tester,
+      const ScheduleScreen(),
+      _schedule(DataSuccess<WeekSchedule>(_week(), DateTime.now())),
+    );
 
     expect(find.textContaining('Mis à jour aujourd\'hui'), findsOneWidget);
-    expect(find.text('DEVELOPPEMENT WEB'), findsWidgets);
+    expect(find.text('COURS LUN'), findsOneWidget);
+    expect(find.text('COURS MAR'), findsNothing);
+    expect(find.text('12 – 16 oct. 2026'), findsOneWidget);
+    expect(find.text('Prochains cours'), findsOneWidget);
+    expect(find.text('Cours précédents'), findsOneWidget);
+  });
+
+  testWidgets('planning : toucher un jour de la bande affiche ses séances', (tester) async {
+    await _pump(
+      tester,
+      const ScheduleScreen(),
+      _schedule(DataSuccess<WeekSchedule>(_week(), DateTime.now())),
+    );
+
+    await tester.tap(find.text('Mar'));
+    await tester.pump();
+
+    expect(find.text('COURS MAR'), findsOneWidget);
+    expect(find.text('COURS LUN'), findsNothing);
+  });
+
+  testWidgets('planning : jour sans cours, lien vers le prochain cours', (tester) async {
+    await _pump(
+      tester,
+      const ScheduleScreen(),
+      _schedule(DataSuccess<WeekSchedule>(_week(emptyDays: {0, 1, 2}), DateTime.now())),
+    );
+
+    expect(find.text('Pas de cours ce jour'), findsOneWidget);
+    await tester.tap(find.text('Prochain cours : jeudi 15 octobre à 08:30'));
+    await tester.pump();
+
+    expect(find.text('COURS JEU'), findsOneWidget);
   });
 
   testWidgets('planning en erreur : « Réessayer » appelle refresh', (tester) async {
-    final _FakeScheduleController fake = _FakeScheduleController(
-      DataError<WeekSchedule>(NetworkFailure.offline()),
-    );
-    await _pump(tester, const ScheduleScreen(), [
-      scheduleControllerProvider.overrideWith(() => fake),
-    ]);
+    final DataError<WeekSchedule> error = DataError<WeekSchedule>(NetworkFailure.offline());
+    final _FakeScheduleController fake = _FakeScheduleController(error);
+    await _pump(tester, const ScheduleScreen(), _schedule(error, fake: fake));
 
     expect(find.text('Pas de connexion'), findsOneWidget);
     await tester.tap(find.text('Réessayer'));
@@ -103,17 +139,17 @@ void main() {
   });
 
   testWidgets('planning en cache après échec : bandeau d\'avertissement', (tester) async {
-    await _pump(tester, const ScheduleScreen(), [
-      scheduleControllerProvider.overrideWith(
-        () => _FakeScheduleController(
-          DataCached<WeekSchedule>(
-            _week(),
-            DateTime.now().subtract(const Duration(days: 1)),
-            failure: ServerFailure.status(503),
-          ),
+    await _pump(
+      tester,
+      const ScheduleScreen(),
+      _schedule(
+        DataCached<WeekSchedule>(
+          _week(),
+          DateTime.now().subtract(const Duration(days: 1)),
+          failure: ServerFailure.status(503),
         ),
       ),
-    ]);
+    );
 
     expect(find.text('Rafraîchissement impossible'), findsOneWidget);
     expect(find.textContaining('hier à'), findsOneWidget);

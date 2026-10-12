@@ -27,7 +27,65 @@ abstract final class DateFormatFr {
     'décembre',
   ];
 
+  static const List<String> _weekdaysShort = [
+    'Lun',
+    'Mar',
+    'Mer',
+    'Jeu',
+    'Ven',
+    'Sam',
+    'Dim',
+  ];
+
+  static const List<String> _monthsShort = [
+    'janv.',
+    'févr.',
+    'mars',
+    'avr.',
+    'mai',
+    'juin',
+    'juil.',
+    'août',
+    'sept.',
+    'oct.',
+    'nov.',
+    'déc.',
+  ];
+
   static String _two(int n) => n.toString().padLeft(2, '0');
+
+  /// « Lun »
+  static String weekdayShort(DateTime d) => _weekdaysShort[d.weekday - 1];
+
+  /// « mardi 13 octobre »
+  static String dayInline(DateTime d) =>
+      '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
+
+  /// « 5 août 2026 »
+  static String dateLong(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
+
+  /// Semaine du lundi au vendredi : « 12 – 16 oct. 2026 »,
+  /// « 29 sept. – 3 oct. 2026 », « 29 déc. 2025 – 2 janv. 2026 ».
+  static String weekRangeShort(DateTime monday) {
+    final DateTime friday = DateTime(monday.year, monday.month, monday.day + 4);
+    final String end = '${friday.day} ${_monthsShort[friday.month - 1]} ${friday.year}';
+    if (monday.year != friday.year) {
+      return '${monday.day} ${_monthsShort[monday.month - 1]} ${monday.year} – $end';
+    }
+    if (monday.month != friday.month) {
+      return '${monday.day} ${_monthsShort[monday.month - 1]} – $end';
+    }
+    return '${monday.day} – $end';
+  }
+
+  /// Durée courte : « 25 min », « 1 h 05 », « 3 h ».
+  static String duration(Duration d) {
+    final int minutes = d.inMinutes < 1 ? 1 : d.inMinutes;
+    if (minutes < 60) return '$minutes min';
+    final int hours = minutes ~/ 60;
+    final int rest = minutes % 60;
+    return rest == 0 ? '$hours h' : '$hours h ${_two(rest)}';
+  }
 
   /// « 08:30 »
   static String time(DateTime d) => '${_two(d.hour)}:${_two(d.minute)}';
@@ -40,16 +98,6 @@ abstract final class DateFormatFr {
     final String weekday = _weekdays[d.weekday - 1];
     return '${weekday[0].toUpperCase()}${weekday.substring(1)} '
         '${d.day} ${_months[d.month - 1]}';
-  }
-
-  /// « du 13 au 17 octobre », « du 29 septembre au 3 octobre »
-  static String weekRange(DateTime monday) {
-    final DateTime friday = DateTime(monday.year, monday.month, monday.day + 4);
-    if (monday.month == friday.month) {
-      return 'du ${monday.day} au ${friday.day} ${_months[friday.month - 1]}';
-    }
-    return 'du ${monday.day} ${_months[monday.month - 1]} '
-        'au ${friday.day} ${_months[friday.month - 1]}';
   }
 
   /// « Mis à jour aujourd'hui à 19:30 », « … hier à … », « … le 12/10/2026 à … »

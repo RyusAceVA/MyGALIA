@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
@@ -26,6 +27,11 @@ class MyGaliaApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
+
+      // Composants Material en français (sélecteur de date, menus…).
+      locale: const Locale('fr', 'FR'),
+      supportedLocales: const [Locale('fr', 'FR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
 
       home: const AuthGate(),
     );
