@@ -38,12 +38,20 @@ abstract final class GradesParser {
 
   /// Regex d'origine (§4.1 a), ancrée sur des repères sémantiques stables :
   /// note, « /20 », coefficient, matière, date « du JJ/MM/AAAA », type.
+  ///
+  /// Chaque `.*?` d'origine est « tempéré » (`_inBlock`) : il ne peut pas
+  /// franchir le « /20 » de la note suivante. Un bloc incomplet (sans date,
+  /// par exemple) ne fusionne donc jamais avec la note d'après, qui serait
+  /// sinon perdue ; coefficient, date et type sont facultatifs.
+  static const String _inBlock = r'(?:(?!/20\s*</span>).)*?';
   static final RegExp _gradeBlock = RegExp(
     r'>([\d.,]+)</span>\s*<span[^>]*>\s*/20\s*</span>'
-    r'.*?coeff\.\s*([\d,]+)'
-    r'.*?<td[^>]*>\s*<span[^>]*>([^<]+)</span>'
-    r'.*?du\s+(\d{2}/\d{2}/\d{4})'
-    r'[^<]*</span>\s*<span[^>]*>([^<]*)</span>',
+    '(?:$_inBlock'
+    r'coeff\.\s*([\d,]+))?'
+    '$_inBlock'
+    r'<td[^>]*>\s*<span[^>]*>([^<]+)</span>'
+    '(?:$_inBlock'
+    r'du\s+(\d{2}/\d{2}/\d{4})[^<]*</span>\s*<span[^>]*>([^<]*)</span>)?',
     dotAll: true,
   );
 
@@ -79,12 +87,18 @@ abstract final class GradesParser {
           if (_number(m.group(1)!) case final double value)
             Grade(
               value: value,
-              coefficient: _number(m.group(2)!) ?? 1,
+              coefficient: _number(m.group(2) ?? '') ?? 1,
               subject: _text(m.group(3)!),
-              date: _parseDate(m.group(4)!),
-              type: _text(m.group(5)!).isEmpty ? null : _text(m.group(5)!),
+              date: _parseDate(m.group(4) ?? ''),
+              type: _optionalText(m.group(5)),
             ),
       ];
+
+  static String? _optionalText(String? raw) {
+    if (raw == null) return null;
+    final String text = _text(raw);
+    return text.isEmpty ? null : text;
+  }
 
   /// Tout ce qu'un navigateur posterait : champs `input` (cachés, texte…),
   /// radios et cases COCHÉS uniquement, valeur sélectionnée de chaque

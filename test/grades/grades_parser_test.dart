@@ -23,6 +23,38 @@ void main() {
     expect(page.grades[1].type, 'TP noté');
   });
 
+  test('une note sans date ne fusionne pas avec la suivante (aucune perdue)', () {
+    const String html = '''
+<table>
+<tr><td><span style="font-weight:bold;">12</span> <span>/20</span>
+<span style="font-size:9px;">coeff. 1,00</span>
+</td><td style="padding-left:3px;">
+  <span style="font-size:13px;">Projet tutoré</span>
+  <span style="font-size:11px;">REF PROJ</span>
+  <span style="font-size:9px;"></span>
+</td></tr>
+<tr><td><span style="font-weight:bold;">8</span> <span>/20</span>
+<span style="font-size:9px;">coeff. 2,00</span>
+</td><td style="padding-left:3px;">
+  <span style="font-size:13px;">Réseaux</span>
+  <span style="font-size:11px;">REF RES          du 03/06/2025</span>
+  <span style="font-size:9px;">TP noté</span>
+</td></tr>
+</table>''';
+
+    final List<Grade> grades = GradesParser.parseGrades(html);
+
+    expect(grades, hasLength(2));
+    expect(grades.first.value, 12);
+    expect(grades.first.subject, 'Projet tutoré');
+    expect(grades.first.date, isNull);
+    expect(grades.last.value, 8);
+    expect(grades.last.coefficient, 2);
+    expect(grades.last.subject, 'Réseaux');
+    expect(grades.last.date, DateTime(2025, 6, 3));
+    expect(grades.last.type, 'TP noté');
+  });
+
   test('nombres français normalisés (« 15,5 », coeff « 2,00 »)', () {
     final Grade grade =
         GradesParser.parse(FakeScFormServer.notesPageHtml(period: '31')).grades.single;
