@@ -1,0 +1,63 @@
+name: mygalia
+description: "MyGalia — alternative moderne à SC-Form (Material 3 Expressive)."
+publish_to: "none"
+
+# Version applicative (SemVer + build number après le +)
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+# ---------------------------------------------------------------------------
+# Dépendances runtime
+# ---------------------------------------------------------------------------
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- Gestion d'état (Riverpod + code generation) -------------------------
+  flutter_riverpod: ^2.6.1 # Conteneur d'état / injection de dépendances
+  riverpod_annotation: ^2.6.1 # Annotations @riverpod pour la codegen
+
+  # --- Réseau --------------------------------------------------------------
+  dio: ^5.7.0 # Client HTTP (intercepteurs, retry, gestion tokens)
+
+  # --- Stockage ------------------------------------------------------------
+  flutter_secure_storage: ^9.2.2 # Secrets sensibles (tokens, credentials)
+  hive: ^2.2.3 # Base clé/valeur locale rapide (cache)
+  hive_flutter: ^1.1.0 # Intégration Hive <-> Flutter (init, path)
+
+  # --- UI / Design ---------------------------------------------------------
+  google_fonts: ^6.2.1 # Typographies (Inter / Space Grotesk)
+  flutter_svg: ^2.0.16 # Rendu des icônes / illustrations vectorielles
+
+  cupertino_icons: ^1.0.8
+
+# ---------------------------------------------------------------------------
+# Dépendances de développement (codegen, lint, tests)
+# ---------------------------------------------------------------------------
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Analyse statique
+  flutter_lints: ^5.0.0
+
+  # --- Codegen & lints Riverpod/Hive (désactivés pour l'instant) -----------
+  # On utilise des providers Riverpod MANUELS (pas d'annotations @riverpod) et
+  # aucun TypeAdapter Hive pour l'instant, donc pas besoin de build_runner.
+  # hive_generator épingle un vieil `analyzer` incompatible avec Dart 3.12,
+  # ce qui casse la résolution ; on les réintroduira avec des versions
+  # compatibles le jour où la génération de code sera réellement nécessaire :
+  #   build_runner, riverpod_generator, hive_generator,
+  #   custom_lint, riverpod_lint
+
+# ---------------------------------------------------------------------------
+# Configuration Flutter
+# ---------------------------------------------------------------------------
+flutter:
+  uses-material-design: true
+  # Décommenter au fur et à mesure de l'ajout des assets :
+  # assets:
+  #   - assets/icons/
+  #   - assets/images/

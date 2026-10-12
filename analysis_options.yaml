@@ -1,0 +1,19 @@
+# Règles d'analyse statique pour MyGalia.
+# flutter_lints fournit la base recommandée par l'équipe Flutter.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # NB : le plugin custom_lint (règles riverpod_lint) sera réactivé ici quand
+  # on réintroduira les dépendances de lint/codegen dans pubspec.yaml.
+  exclude:
+    # Fichiers générés par build_runner (Riverpod / Hive)
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # Cohérence de style pour une base feature-first lisible
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_final_locals: true
+    always_use_package_imports: true
