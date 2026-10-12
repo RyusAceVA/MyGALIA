@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/expressive_refresh_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 
 /// Affiche un [DataState] :
-///  * chargement : indicateur central ;
+///  * chargement : indicateur à formes au centre ;
 ///  * erreur : explication claire et bouton « Réessayer » ;
 ///  * données (fraîches ou en cache) : date « Mis à jour … » et, si le
 ///    rafraîchissement a échoué, un bandeau d'alerte avec « Réessayer ».
 ///
 /// Le pull-to-refresh est disponible dans tous les états (y compris
 /// erreur et liste vide) et appelle [onRefresh], qui interroge le réseau.
+/// Tout rafraîchissement en cours, tiré ou automatique, est signalé par
+/// l'indicateur à formes en haut de la liste.
 class DataStateView<T> extends StatelessWidget {
   const DataStateView({
     super.key,
@@ -28,8 +33,8 @@ class DataStateView<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<Widget> children = switch (state) {
       DataLoading<T>() => const [
-          SizedBox(height: 160),
-          Center(child: CircularProgressIndicator()),
+          SizedBox(height: 140),
+          Center(child: ExpressiveLoadingIndicator(size: 56)),
         ],
       DataError<T>(:final Failure failure) => [
           ErrorPanel(failure: failure, onRetry: onRefresh),
@@ -56,8 +61,9 @@ class DataStateView<T> extends StatelessWidget {
           ...builder(context, data),
         ],
     };
-    return RefreshIndicator(
+    return ExpressiveRefreshIndicator(
       onRefresh: onRefresh,
+      refreshing: state.isRefreshing,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         // La marge basse inclut la barre de navigation flottante.
@@ -68,16 +74,25 @@ class DataStateView<T> extends StatelessWidget {
   }
 }
 
-/// Fine barre de progression pendant un rafraîchissement en arrière-plan.
-class RefreshProgress extends StatelessWidget {
-  const RefreshProgress({super.key, required this.visible});
+/// Barre en vague sous l'en-tête pendant une recherche ; elle se déplie
+/// et se replie en douceur.
+class SearchProgressBar extends StatelessWidget {
+  const SearchProgressBar({super.key, required this.visible, this.semanticsLabel});
 
   final bool visible;
+  final String? semanticsLabel;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 2,
-        child: visible ? const LinearProgressIndicator(minHeight: 2) : null,
+  Widget build(BuildContext context) => AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: visible
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                child: WavyLinearProgressIndicator(semanticsLabel: semanticsLabel),
+              )
+            : const SizedBox(width: double.infinity),
       );
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
@@ -62,7 +63,10 @@ class ScheduleScreen extends ConsumerWidget {
             onJump: (PeriodJumpDirection direction) =>
                 jumpToPeriod(context, ref, from: selected, direction: direction),
           ),
-          RefreshProgress(visible: state.isRefreshing || searching != null),
+          SearchProgressBar(
+            visible: searching != null,
+            semanticsLabel: 'Recherche des cours',
+          ),
           Expanded(
             // Balayer horizontalement change de jour (et de semaine aux bords).
             child: GestureDetector(
@@ -405,10 +409,7 @@ class _JumpButton extends StatelessWidget {
       onPressed: onPressed,
       iconAlignment: iconAtEnd ? IconAlignment.end : IconAlignment.start,
       icon: searching
-          ? const SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
+          ? const ExpressiveLoadingIndicator(size: 22, semanticsLabel: 'Recherche en cours')
           : Icon(icon),
       label: Text(
         searching ? 'Recherche… (annuler)' : label,

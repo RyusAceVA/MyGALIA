@@ -42,7 +42,6 @@ class GradesScreen extends ConsumerWidget {
                 },
               ),
             ),
-          RefreshProgress(visible: state.isRefreshing),
           Expanded(
             child: DataStateView<GradesSnapshot>(
               state: state,

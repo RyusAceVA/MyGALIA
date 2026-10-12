@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
 import 'package:mygalia/features/grades/presentation/grades_controller.dart';
 import 'package:mygalia/features/grades/presentation/grades_screen.dart';
@@ -96,6 +98,19 @@ void main() {
     expect(find.text('12 – 16 oct. 2026'), findsOneWidget);
     expect(find.text('Prochains cours'), findsOneWidget);
     expect(find.text('Cours précédents'), findsOneWidget);
+  });
+
+  testWidgets('planning en cours de rafraîchissement : indicateur à formes en haut de la liste', (tester) async {
+    await _pump(
+      tester,
+      const ScheduleScreen(),
+      _schedule(DataSuccess<WeekSchedule>(_week(), DateTime.now(), isRefreshing: true)),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(ExpressiveLoadingIndicator), findsOneWidget);
+    expect(find.text('COURS LUN'), findsOneWidget, reason: 'les données restent affichées');
+    expect(find.byType(WavyLinearProgressIndicator), findsNothing, reason: 'pas de recherche');
   });
 
   testWidgets('planning : toucher un jour de la bande affiche ses séances', (tester) async {
@@ -217,7 +232,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(ExpressiveLoadingIndicator), findsOneWidget);
     expect(find.byType(SegmentedButton<String>), findsOneWidget);
     final SegmentedButton<String> selector =
         tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));

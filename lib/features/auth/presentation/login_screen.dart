@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/network/failure.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
 
 /// Écran de connexion avec le compte SC Form.
@@ -148,9 +149,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       FilledButton(
                         onPressed: _submitting ? null : _submit,
                         child: _submitting
-                            ? const SizedBox.square(
-                                dimension: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ? const ExpressiveLoadingIndicator(
+                                size: 32,
+                                semanticsLabel: 'Connexion en cours',
                               )
                             : const Text('Se connecter'),
                       ),

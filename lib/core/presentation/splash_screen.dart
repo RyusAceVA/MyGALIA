@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'package:mygalia/core/constants/app_constants.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
 
 /// Écran de garde minimaliste affiché au démarrage.
 ///
 /// Placeholder pour l'étape 1 : il occupe la route d'accueil en attendant
 /// le futur routeur (auth guard -> dashboard). Style épuré « Nothing OS » :
-/// fond neutre, logotype typographique centré, indicateur discret.
+/// fond neutre, logotype typographique centré, indicateur à formes.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -34,15 +35,8 @@ class SplashScreen extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: theme.colorScheme.primary,
-              ),
-            ),
+            const SizedBox(height: 32),
+            const ExpressiveLoadingIndicator(size: 48),
           ],
         ),
       ),

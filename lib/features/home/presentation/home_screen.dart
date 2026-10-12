@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mygalia/core/clock.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/presentation/data_state.dart';
+import 'package:mygalia/core/presentation/expressive/expressive_refresh_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/loading_indicator.dart';
+import 'package:mygalia/core/presentation/expressive/wavy_progress_indicator.dart';
 import 'package:mygalia/core/presentation/home_tabs.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/presentation/widgets/section_title.dart';
@@ -77,8 +80,9 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: ExpressiveRefreshIndicator(
         onRefresh: refreshAll,
+        refreshing: week.isRefreshing || grades.isRefreshing,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.paddingOf(context).bottom),
@@ -186,7 +190,7 @@ class _NextCourseCard extends StatelessWidget {
       return const _InfoCard(
         icon: Icons.hourglass_empty_rounded,
         title: 'Chargement du planning…',
-        action: LinearProgressIndicator(),
+        action: WavyLinearProgressIndicator(semanticsLabel: 'Chargement du planning'),
       );
     }
 
@@ -348,9 +352,9 @@ class _CourseCard extends StatelessWidget {
                     ),
                     if (value != null) ...[
                       const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(value: value, minHeight: 6),
+                      WavyLinearProgressIndicator(
+                        value: value,
+                        semanticsLabel: 'Avancement du cours',
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -466,12 +470,9 @@ class _LatestGrades extends StatelessWidget {
     final DataState<GradesSnapshot> current = state;
     if (current is DataLoading<GradesSnapshot>) {
       return const Padding(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(12),
         child: Center(
-          child: SizedBox.square(
-            dimension: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
+          child: ExpressiveLoadingIndicator(size: 40, semanticsLabel: 'Chargement des notes'),
         ),
       );
     }
