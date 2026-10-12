@@ -69,7 +69,11 @@ abstract final class AppTheme {
         centerTitle: false,
         backgroundColor: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: textTheme.titleLarge,
+        // Titre court et discret (comme l'ancienne app) : le contenu prime.
+        titleTextStyle: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: scheme.onSurface,
+        ),
       ),
 
       // --- Cartes : angles très arrondis, ombre quasi absente --------------
