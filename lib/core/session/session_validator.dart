@@ -18,13 +18,9 @@ abstract final class SessionValidator {
       status == 307 ||
       status == 308;
 
-  /// Vrai si [body] est une page de connexion (formulaire avec mot de passe).
-  ///
-  /// [unlessContains] : marqueur d'une page de données légitime ; s'il est
-  /// présent, la page n'est pas considérée comme un login (même principe que
-  /// l'heuristique d'origine `password` + absence de `/20`, §5.1).
-  static bool isLoginPage(String body, {Pattern? unlessContains}) {
-    if (!_passwordInput.hasMatch(body)) return false;
-    return unlessContains == null || !body.contains(unlessContains);
-  }
+  /// Vrai si [body] contient un formulaire de connexion (champ mot de passe).
+  /// À n'utiliser que sur une page dépourvue de repère de données légitime
+  /// (même principe que l'heuristique d'origine `password` + absence de
+  /// `/20`, §5.1).
+  static bool isLoginPage(String body) => _passwordInput.hasMatch(body);
 }

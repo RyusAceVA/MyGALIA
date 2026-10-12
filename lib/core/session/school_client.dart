@@ -32,7 +32,8 @@ Failure _sessionLost() => const SessionFailure(
 ///  * redirection (3xx) : jamais attendue pour une page de données ;
 ///  * 401 / 403 ;
 ///  * page de connexion renvoyée en 200 ;
-///  * page vide.
+///  * page vide ;
+///  * page sans aucun repère de page de données (erreur, maintenance…).
 ///
 /// Dans tous ces cas, la session est renouvelée (une seule reconnexion pour
 /// toutes les requêtes concernées, voir [SessionManager.renew]) puis
@@ -87,7 +88,7 @@ class SchoolClient {
     String method,
     Uri uri, {
     Map<String, String>? form,
-    Pattern? dataMarker,
+    required Pattern marker,
   }) async {
     final EdcSession session = requester.session;
     final String? body = form == null ? null : encodeForm(form);
@@ -142,10 +143,23 @@ class SchoolClient {
         ),
       );
     }
-    if (SessionValidator.isLoginPage(data, unlessContains: dataMarker)) {
+    // Une page de données légitime porte toujours un repère reconnu. Sans
+    // repère, ce n'est pas une page de données : soit la page de connexion,
+    // soit une page inattendue (erreur, maintenance, redirection JavaScript,
+    // session morte affichée autrement). Dans les deux cas, la session est
+    // suspecte : reconnexion et rejeu une fois ; jamais de mise en cache.
+    if (!data.contains(marker)) {
+      if (SessionValidator.isLoginPage(data)) {
+        throw _SessionRejected(
+          'page de connexion reçue à la place des données',
+          afterReplay: _sessionLost,
+        );
+      }
       throw _SessionRejected(
-        'page de connexion reçue à la place des données',
-        afterReplay: _sessionLost,
+        'page inattendue (ni repère de données, ni formulaire de connexion)',
+        afterReplay: () => const DataFailure(
+          'La page reçue de l\'espace école n\'a pas le format attendu.',
+        ),
       );
     }
     return data;
@@ -209,18 +223,19 @@ class SchoolRequester {
     return config.schoolUri('${ScFormConfig.galiaEdcPrefix}/$segment$path');
   }
 
-  /// Page HTML de données. [dataMarker] : marqueur d'une page légitime, qui
-  /// empêche de la confondre avec une page de connexion.
-  Future<String> getPage(Uri uri, {Pattern? dataMarker}) =>
-      _client._fetch(this, 'GET', uri, dataMarker: dataMarker);
+  /// Page HTML de données. [marker] : repère toujours présent sur une page
+  /// légitime (même sans données). Une page sans repère est traitée comme
+  /// une session suspecte (voir [SchoolClient]).
+  Future<String> getPage(Uri uri, {required Pattern marker}) =>
+      _client._fetch(this, 'GET', uri, marker: marker);
 
   /// Postback WebForms (§4.2).
   Future<String> postForm(
     Uri uri,
     Map<String, String> fields, {
-    Pattern? dataMarker,
+    required Pattern marker,
   }) =>
-      _client._fetch(this, 'POST', uri, form: fields, dataMarker: dataMarker);
+      _client._fetch(this, 'POST', uri, form: fields, marker: marker);
 }
 
 final schoolClientProvider = Provider<SchoolClient>((ref) {

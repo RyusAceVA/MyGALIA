@@ -65,6 +65,17 @@ void main() {
     expect(box.isEmpty, isTrue);
   });
 
+  test('page d\'erreur HTML : ni « jour sans cours », ni cache écrasé', () async {
+    final CachedValue<WeekSchedule> valid = await schedule.fetchWeek(monday);
+    env.server.planningBodyOverride = FakeScFormServer.errorPageHtml;
+
+    await expectLater(schedule.fetchWeek(monday), throwsA(isA<DataFailure>()));
+
+    final CachedValue<WeekSchedule>? cached = schedule.cachedWeek(monday);
+    expect(cached?.data.courses, valid.data.courses, reason: 'pas de semaine vide en cache');
+    expect(env.sessions.renewalCount, 2, reason: 'page inattendue = une reconnexion');
+  });
+
   test('un rafraîchissement raté laisse intact le dernier cache valide', () async {
     final CachedValue<WeekSchedule> valid = await schedule.fetchWeek(monday);
     env.server.planningBodyOverride = 'corrompu';

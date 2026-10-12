@@ -5,7 +5,15 @@ import 'dart:io';
 import 'package:mygalia/core/network/scform_config.dart';
 
 /// Façon dont le serveur signale une session école expirée.
-enum ExpiryMode { loginPage200, redirect302, unauthorized401, emptyBody200 }
+enum ExpiryMode {
+  loginPage200,
+  redirect302,
+  unauthorized401,
+  emptyBody200,
+
+  /// Page d'erreur HTML en 200, sans formulaire de connexion.
+  errorPage200,
+}
 
 /// Faux serveur SC Form : un VRAI serveur HTTP local (équivalent de
 /// MockWebServer) qui reproduit le protocole de REVERSE_ENGINEERING.md :
@@ -293,6 +301,8 @@ class FakeScFormServer {
         res.statusCode = 401;
       case ExpiryMode.emptyBody200:
         _html(res, '');
+      case ExpiryMode.errorPage200:
+        _html(res, errorPageHtml);
     }
   }
 
@@ -323,6 +333,12 @@ class FakeScFormServer {
 <input type="password" name="ctl00\$MotDePasse" />
 <input type="submit" value="Connexion" />
 </form></body></html>''';
+
+  /// Page d'erreur générique, sans repère de données ni formulaire de login.
+  static const String errorPageHtml = '''
+<html><body><h1>Une erreur est survenue</h1>
+<p>Votre session a expiré. <a href="/GaliaEDC/Default.aspx">Retour</a></p>
+</body></html>''';
 
   static String stagiaireHtml(String planningId) => '''
 <html><body>

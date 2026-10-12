@@ -14,10 +14,6 @@ class GradesRemoteDataSource {
 
   final SchoolClient _school;
 
-  /// Une page qui contient le sélecteur de semestre n'est jamais prise pour
-  /// une page de connexion.
-  static const String _dataMarker = 'DropDownLstPeriode';
-
   /// Notes du semestre [periodValue] (vide : semestre affiché par défaut).
   ///
   /// GET puis, seulement si le semestre demandé diffère du semestre affiché,
@@ -32,7 +28,7 @@ class GradesRemoteDataSource {
       (SchoolRequester school) async {
         final Uri uri = school.galiaEdcUri(ScFormConfig.mesNotesPath);
         final GradesPage page = GradesParser.parse(
-          await school.getPage(uri, dataMarker: _dataMarker),
+          await school.getPage(uri, marker: GradesParser.pageMarker),
         );
         if (periodValue.isEmpty || periodValue == page.selectedPeriod) {
           return page.toSnapshot();
@@ -52,7 +48,7 @@ class GradesRemoteDataSource {
           ..['__EVENTARGUMENT'] = ''
           ..[target] = periodValue;
         final GradesPage switched = GradesParser.parse(
-          await school.postForm(uri, form, dataMarker: _dataMarker),
+          await school.postForm(uri, form, marker: GradesParser.pageMarker),
         );
         if (switched.selectedPeriod != null &&
             switched.selectedPeriod != periodValue) {

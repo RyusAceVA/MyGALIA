@@ -30,6 +30,30 @@ abstract final class ScheduleParser {
   static final RegExp _lineBreak = RegExp(r'\r\n|\r|\n');
   static final RegExp _spaces = RegExp(r'\s+');
 
+  static const List<String> _months = [
+    'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+    'août', 'septembre', 'octobre', 'novembre', 'décembre',
+  ];
+
+  /// Repères d'une vraie page de planning du jour [day], dont au moins un est
+  /// présent même un jour sans cours : la grille (`Bouton_Info`), les liens
+  /// `PlanningJournalier`, ou la date du jour (« 12/10/2026 », « 12 octobre
+  /// 2026 »). Volontairement large : rejeter un jour sans cours légitime
+  /// casserait toute la semaine. Une page sans aucun de ces repères (page
+  /// d'erreur, de maintenance, redirection JavaScript…) n'est jamais prise
+  /// pour un jour sans cours.
+  static Pattern pageMarker(DateTime day) {
+    final int d = day.day;
+    final int m = day.month;
+    final int y = day.year;
+    return RegExp(
+      'Bouton_Info|PlanningJournalier'
+      r'|(?<!\d)0?' '$d' r'/0?' '$m' '/$y' r'(?!\d)'
+      r'|(?<!\d)' '$d' r'(?:er)?\s+' '${_months[m - 1]}' r'\s+' '$y',
+      caseSensitive: false,
+    );
+  }
+
   /// Séances d'une page journalière, triées par heure.
   ///
   /// Lève [DataFailure] si la page n'est pas du HTML, ou si elle contient

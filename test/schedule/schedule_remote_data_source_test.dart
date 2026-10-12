@@ -37,6 +37,10 @@ void main() {
       env.container.read(scheduleRemoteDataSourceProvider).fetchWeek(monday),
       throwsA(isA<DataFailure>()),
     );
-    expect(env.server.planningCalls, 1, reason: 'les jours suivants ne sont pas demandés');
+    expect(
+      env.server.planningCalls,
+      2,
+      reason: 'lundi : essai + rejeu après reconnexion ; jours suivants non demandés',
+    );
   });
 }

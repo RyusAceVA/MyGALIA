@@ -94,15 +94,17 @@ void main() {
     await settled();
     final int before = env.server.planningCalls;
 
+    // Un rechargement sur page corrompue = 2 requêtes (essai + rejeu après
+    // reconnexion, la page n'ayant pas de repère de données).
     await signal(RefreshReason.networkBack);
     await settled();
     await signal(RefreshReason.networkBack);
     await settled();
-    expect(env.server.planningCalls - before, 1, reason: 'second signal ignoré');
+    expect(env.server.planningCalls - before, 2, reason: 'second signal ignoré');
 
     fakeNow = fakeNow.add(const Duration(seconds: 21));
     await signal(RefreshReason.networkBack);
     await settled();
-    expect(env.server.planningCalls - before, 2);
+    expect(env.server.planningCalls - before, 4);
   });
 }

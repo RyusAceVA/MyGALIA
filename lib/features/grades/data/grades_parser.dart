@@ -50,6 +50,11 @@ abstract final class GradesParser {
   static final RegExp _date = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$');
   static final RegExp _spaces = RegExp(r'\s+');
 
+  /// Repère d'une vraie page de notes : le sélecteur de semestre, ou au
+  /// moins une note « /20 ». Sans lui, la page n'est pas une page de notes
+  /// (même si elle contient un champ mot de passe ailleurs).
+  static final RegExp pageMarker = RegExp(r'DropDownLstPeriode|>\s*/20\s*<');
+
   /// Lève [DataFailure] si la page n'est pas une page de notes : ni
   /// sélecteur de semestre, ni note reconnaissable. Un semestre sans note
   /// (sélecteur présent) reste une page valide.

@@ -102,6 +102,32 @@ void main() {
     expect(ScheduleParser.parseDay(html).single.subject, 'MATHS');
   });
 
+  group('repère de page de planning (jour sans cours compris)', () {
+    final DateTime day = DateTime(2026, 10, 12);
+    final Pattern marker = ScheduleParser.pageMarker(day);
+
+    test('reconnu : grille vide, liens de navigation, date courte ou longue', () {
+      for (final String page in [
+        '<div class="Bouton_Info" title=""></div>',
+        '<a href="/PlanningWeb/PlanningJournalier/Stagiaire?id=1&Jour=13">›</a>',
+        '<h2>Planning du 12/10/2026</h2>',
+        '<h2>Lundi 12 octobre 2026</h2>',
+      ]) {
+        expect('<html><body>$page</body></html>'.contains(marker), isTrue, reason: page);
+      }
+    });
+
+    test('absent : page d\'erreur, autre jour', () {
+      for (final String page in [
+        '<h1>Une erreur est survenue</h1>',
+        '<p>Planning du 112/10/2026</p>',
+        '<p>Planning du 13/10/2026</p>',
+      ]) {
+        expect('<html><body>$page</body></html>'.contains(marker), isFalse, reason: page);
+      }
+    });
+  });
+
   test('mondayOf : lundi de la semaine, y compris le dimanche', () {
     expect(mondayOf(DateTime(2026, 10, 12)), DateTime(2026, 10, 12));
     expect(mondayOf(DateTime(2026, 10, 18, 23, 59)), DateTime(2026, 10, 12));

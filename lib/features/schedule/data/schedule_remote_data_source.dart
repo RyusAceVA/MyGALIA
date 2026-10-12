@@ -51,7 +51,9 @@ class ScheduleRemoteDataSource {
         'Annee': '${day.year}',
       },
     );
-    return ScheduleParser.parseDay(await school.getPage(uri));
+    return ScheduleParser.parseDay(
+      await school.getPage(uri, marker: ScheduleParser.pageMarker(day)),
+    );
   }
 }
 

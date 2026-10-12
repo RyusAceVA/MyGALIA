@@ -4,6 +4,7 @@ import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/network/scform_config.dart';
 import 'package:mygalia/core/session/school_client.dart';
 import 'package:mygalia/features/auth/domain/edc_session.dart';
+import 'package:mygalia/features/schedule/data/schedule_parser.dart';
 
 import '../support/fake_scform_server.dart';
 import '../support/test_env.dart';
@@ -16,6 +17,7 @@ Future<String> _planningPage(SchoolRequester school) => school.getPage(
         'Mois': '10',
         'Annee': '2026',
       }),
+      marker: ScheduleParser.pageMarker(DateTime(2026, 10, 13)),
     );
 
 void main() {
@@ -45,6 +47,7 @@ void main() {
     ExpiryMode.loginPage200,
     ExpiryMode.redirect302,
     ExpiryMode.unauthorized401,
+    ExpiryMode.errorPage200,
   ]) {
     test('session expirée (${mode.name}) : reconnexion silencieuse et rejeu unique', () async {
       await env.school.run('test', _planningPage);
