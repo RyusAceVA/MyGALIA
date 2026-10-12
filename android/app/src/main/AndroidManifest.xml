@@ -6,7 +6,14 @@
     <application
         android:label="mygalia"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- Pas de sauvegarde ni de transfert des données de l'app : le
+             stockage chiffré restauré sans sa clé Keystore devient illisible
+             (InvalidKeyException) et bloquait l'app jusqu'à « Effacer le
+             stockage ». allowBackup couvre Android <= 11, les règles
+             d'extraction couvrent Android 12+ (cloud et appareil à appareil). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

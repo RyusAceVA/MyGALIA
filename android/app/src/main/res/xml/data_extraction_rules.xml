@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ : aucune donnée de MyGalia n'est sauvegardée dans le cloud ni
+  transférée vers un autre appareil.
+
+  Le coffre chiffré (flutter_secure_storage) dépend d'une clé du Keystore qui,
+  elle, ne voyage jamais : restaurer le fichier sans sa clé le rend illisible.
+  Le cache Hive se reconstruit tout seul depuis le serveur.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

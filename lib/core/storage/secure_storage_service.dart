@@ -19,10 +19,16 @@ class SecureStorageService {
 
   final FlutterSecureStorage _storage;
 
-  /// Options durcies côté Android : force l'implémentation basée sur le
-  /// Keystore matériel plutôt que l'ancienne SharedPreferences chiffrée.
+  /// Options Android :
+  ///  * `encryptedSharedPreferences` : EncryptedSharedPreferences, clé maître
+  ///    dans le Keystore Android ;
+  ///  * `resetOnError` : si le contenu est indéchiffrable (clé Keystore perdue,
+  ///    fichier restauré d'une sauvegarde…), le plugin efface le coffre au lieu
+  ///    d'échouer à chaque lecture. L'utilisateur se reconnecte simplement, au
+  ///    lieu de rester bloqué jusqu'à « Effacer le stockage ».
   static const AndroidOptions _androidOptions = AndroidOptions(
     encryptedSharedPreferences: true,
+    resetOnError: true,
   );
 
   static const IOSOptions _iosOptions = IOSOptions(
