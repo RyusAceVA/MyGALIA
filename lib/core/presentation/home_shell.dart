@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:mygalia/core/lifecycle/app_lifecycle_watcher.dart';
+import 'package:mygalia/core/presentation/widgets/account_menu_button.dart';
 import 'package:mygalia/features/grades/presentation/grades_screen.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_screen.dart';
 
@@ -33,8 +34,11 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          const ScheduleScreen(),
-          if (_visited.contains(1)) const GradesScreen() else const SizedBox.shrink(),
+          const ScheduleScreen(actions: [AccountMenuButton()]),
+          if (_visited.contains(1))
+            const GradesScreen(actions: [AccountMenuButton()])
+          else
+            const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

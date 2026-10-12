@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mygalia/core/debug/app_log.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/session/session_manager.dart';
+import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/core/storage/secure_storage_service.dart';
 import 'package:mygalia/features/auth/data/auth_repository.dart';
 
@@ -88,10 +89,17 @@ class AuthController extends Notifier<AuthState> {
     state = AuthSignedOut(message: message);
   }
 
+  /// Repart de zéro : rien d'une session précédente ne subsiste.
+  ///  * session en mémoire et cookies oubliés : les opérations en cours ne
+  ///    pourront plus rien enregistrer ;
+  ///  * coffre vidé : identifiants, jeton API, session école (cookies,
+  ///    segment, pkEntite) ;
+  ///  * cache Hive vidé : planning et notes.
+  /// Les écrans de données, détruits avec l'écran principal, annulent leurs
+  /// requêtes en cours.
   Future<void> _purge() async {
-    // Session en mémoire oubliée : les opérations en cours ne pourront plus
-    // enregistrer de cookies ni de session.
     ref.read(sessionManagerProvider).reset();
     await ref.read(secureStorageServiceProvider).clearAll();
+    await ref.read(cacheStoreProvider).clear();
   }
 }
