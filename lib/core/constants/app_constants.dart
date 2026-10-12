@@ -1,28 +1,40 @@
 /// Constantes globales de l'application (non sensibles).
 ///
-/// Les secrets (URL privées, clés) n'ont PAS leur place ici : ils passeront
-/// par la configuration d'environnement / [flutter_secure_storage].
+/// Les paramètres du protocole SC Form (URL, en-têtes, chemins) sont dans
+/// `ScFormConfig` ; les secrets ne transitent que par le coffre chiffré
+/// (`SecureStorageService`).
 abstract final class AppConstants {
   AppConstants._();
 
   static const String appName = 'MyGalia';
 
-  /// Base URL de l'API SC-Form (placeholder — à définir à l'étape réseau).
-  static const String apiBaseUrl = 'https://api.example.com';
-
-  /// Délais réseau par défaut (Dio).
-  static const Duration connectTimeout = Duration(seconds: 15);
+  /// Délais réseau (Dio). Chaque requête est bornée : aucune ne peut rester
+  /// pendante indéfiniment. Les relances automatiques (voir `RetryPolicy`)
+  /// s'ajoutent à ces délais.
+  static const Duration connectTimeout = Duration(seconds: 10);
+  static const Duration sendTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 20);
+
+  /// Délais d'attente avant chaque relance automatique d'une erreur
+  /// transitoire (timeout, 5xx, coupure). Deux relances au maximum.
+  static const List<Duration> retryDelays = [
+    Duration(seconds: 1),
+    Duration(seconds: 3),
+  ];
+
+  /// À l'ouverture d'un écran, le cache plus récent que ce délai est affiché
+  /// sans interroger le serveur (navigation entre semaines, retour rapide).
+  static const Duration initialFetchAfter = Duration(minutes: 5);
+
+  /// Au retour au premier plan ou du réseau, les données plus anciennes que
+  /// ce délai sont rechargées automatiquement.
+  static const Duration autoRefreshAfter = Duration(minutes: 30);
+
+  /// Intervalle minimal entre deux rechargements AUTOMATIQUES d'un même
+  /// écran (anti-rafale si le réseau oscille).
+  static const Duration minAutoRefreshInterval = Duration(seconds: 20);
 
   /// Noms des boîtes Hive utilisées pour le cache local.
   static const String settingsBox = 'settings_box';
   static const String cacheBox = 'cache_box';
-
-  /// Clés de stockage sécurisé.
-  static const String kAccessToken = 'access_token';
-  static const String kRefreshToken = 'refresh_token';
-
-  /// Cookie de session SC-Form (le portail fonctionne par session serveur :
-  /// on persiste le cookie renvoyé au login pour le ré-injecter ensuite).
-  static const String kSessionCookie = 'sc_form_session_cookie';
 }
