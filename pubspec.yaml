@@ -21,6 +21,7 @@ dependencies:
 
   # --- Réseau --------------------------------------------------------------
   dio: ^5.7.0 # Client HTTP (intercepteurs, retry, gestion tokens)
+  html: ^0.15.7 # Parseur HTML5 (pages WebForms du planning et des notes)
 
   # --- Stockage ------------------------------------------------------------
   flutter_secure_storage: ^9.2.2 # Secrets sensibles (tokens, credentials)
