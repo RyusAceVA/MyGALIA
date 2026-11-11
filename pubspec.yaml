@@ -17,9 +17,8 @@ dependencies:
   flutter_localizations: # Textes Material en français (sélecteur de date…)
     sdk: flutter
 
-  # --- Gestion d'état (Riverpod + code generation) -------------------------
+  # --- Gestion d'état (Riverpod, providers manuels) ------------------------
   flutter_riverpod: ^2.6.1 # Conteneur d'état / injection de dépendances
-  riverpod_annotation: ^2.6.1 # Annotations @riverpod pour la codegen
 
   # --- Réseau --------------------------------------------------------------
   dio: ^5.7.0 # Client HTTP (intercepteurs, retry, gestion tokens)
@@ -33,9 +32,6 @@ dependencies:
 
   # --- UI / Design ---------------------------------------------------------
   google_fonts: ^6.2.1 # Typographies (Inter / Space Grotesk)
-  flutter_svg: ^2.0.16 # Rendu des icônes / illustrations vectorielles
-
-  cupertino_icons: ^1.0.8
 
 # ---------------------------------------------------------------------------
 # Dépendances de développement (codegen, lint, tests)
