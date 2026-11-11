@@ -12,6 +12,8 @@ import 'package:mygalia/core/settings/theme_mode_controller.dart';
 import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
 import 'package:mygalia/features/auth/presentation/sign_out_dialog.dart';
+import 'package:mygalia/features/grades/presentation/grades_controller.dart';
+import 'package:mygalia/features/schedule/presentation/schedule_controller.dart';
 
 /// Paramètres : profil, apparence, données (cache, déconnexion).
 class SettingsScreen extends ConsumerWidget {
@@ -174,6 +176,10 @@ class SettingsScreen extends ConsumerWidget {
 
   Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
     await ref.read(cacheStoreProvider).clear();
+    // Les écrans déjà ouverts repartent du serveur, pas de leur mémoire.
+    ref
+      ..invalidate(scheduleControllerProvider)
+      ..invalidate(gradesControllerProvider);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Cache local vidé.')),
