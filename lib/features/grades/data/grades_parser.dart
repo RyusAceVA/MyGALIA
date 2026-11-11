@@ -9,6 +9,7 @@ import 'package:mygalia/features/grades/domain/grade.dart';
 class GradesPage {
   const GradesPage({
     required this.grades,
+    this.unreadable = 0,
     required this.periods,
     required this.selectedPeriod,
     required this.periodFieldName,
@@ -16,6 +17,9 @@ class GradesPage {
   });
 
   final List<Grade> grades;
+
+  /// Évaluations annoncées par la page mais non comprises.
+  final int unreadable;
   final List<SchoolPeriod> periods;
   final String? selectedPeriod;
 
@@ -29,6 +33,7 @@ class GradesPage {
         periods: periods,
         selectedPeriod: selectedPeriod,
         grades: grades,
+        unreadable: unreadable,
       );
 }
 
@@ -36,18 +41,25 @@ class GradesPage {
 abstract final class GradesParser {
   GradesParser._();
 
+  /// Barème d'une note : « <span>/20</span> », « <span>/10</span> »…
+  static const String _scale = r'<span[^>]*>\s*/\s*([\d.,]+)\s*</span>';
+
   /// Regex d'origine (§4.1 a), ancrée sur des repères sémantiques stables :
-  /// note, « /20 », coefficient, matière, date « du JJ/MM/AAAA », type.
+  /// note, barème, coefficient, matière, date « du JJ/MM/AAAA », type.
+  ///
+  /// La note n'est pas forcément un nombre (« ABS », « DISP »…) ni le barème
+  /// forcément 20 : rien de ce que l'école affiche ne doit disparaître.
   ///
   /// Chaque `.*?` d'origine est « tempéré » (`_inBlock`) : il ne peut pas
-  /// franchir le « /20 » de la note suivante. Un bloc incomplet (sans date,
+  /// franchir le barème de la note suivante. Un bloc incomplet (sans date,
   /// par exemple) ne fusionne donc jamais avec la note d'après, qui serait
   /// sinon perdue ; coefficient, date et type sont facultatifs.
-  static const String _inBlock = r'(?:(?!/20\s*</span>).)*?';
+  static const String _inBlock = r'(?:(?!/\s*[\d.,]+\s*</span>).)*?';
   static final RegExp _gradeBlock = RegExp(
-    r'>([\d.,]+)</span>\s*<span[^>]*>\s*/20\s*</span>'
+    r'>([^<>]{1,24})</span>\s*'
+    '$_scale'
     '(?:$_inBlock'
-    r'coeff\.\s*([\d,]+))?'
+    r'coeff\.\s*([\d.,]+))?'
     '$_inBlock'
     r'<td[^>]*>\s*<span[^>]*>([^<]+)</span>'
     '(?:$_inBlock'
@@ -55,17 +67,24 @@ abstract final class GradesParser {
     dotAll: true,
   );
 
+  /// Indices d'évaluations, indépendants de [_gradeBlock] : s'il y en a plus
+  /// que de notes comprises, la page a changé de format.
+  static final RegExp _scaleHint = RegExp(_scale);
+  static final RegExp _coefficientHint = RegExp(r'coeff\.\s*[\d.,]+');
+
   static final RegExp _date = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$');
   static final RegExp _spaces = RegExp(r'\s+');
 
   /// Repère d'une vraie page de notes : le sélecteur de semestre, ou au
   /// moins une note « /20 ». Sans lui, la page n'est pas une page de notes
   /// (même si elle contient un champ mot de passe ailleurs).
-  static final RegExp pageMarker = RegExp(r'DropDownLstPeriode|>\s*/20\s*<');
+  static final RegExp pageMarker =
+      RegExp(r'DropDownLstPeriode|>\s*/\s*\d+\s*<');
 
-  /// Lève [DataFailure] si la page n'est pas une page de notes : ni
-  /// sélecteur de semestre, ni note reconnaissable. Un semestre sans note
-  /// (sélecteur présent) reste une page valide.
+  /// Lève [DataFailure] si la page n'est pas une page de notes (ni sélecteur
+  /// de semestre, ni note), ou si elle annonce des évaluations dont aucune
+  /// n'est comprise : le format a changé, et « aucune note » serait un
+  /// mensonge. Un semestre réellement sans note reste une page valide.
   static GradesPage parse(String html) {
     final Document document = html_parser.parse(html);
     final Element? select = _periodSelect(document);
@@ -73,8 +92,15 @@ abstract final class GradesParser {
     if (select == null && grades.isEmpty) {
       throw const DataFailure('La page des notes reçue est illisible.');
     }
+    final int unreadable = countUnreadable(html, grades.length);
+    if (grades.isEmpty && unreadable > 0) {
+      throw const DataFailure(
+        'Le format de la page des notes a changé : notes illisibles.',
+      );
+    }
     return GradesPage(
       grades: grades,
+      unreadable: unreadable,
       periods: select == null ? const <SchoolPeriod>[] : _periods(select),
       selectedPeriod: select == null ? null : _selectedValue(select),
       periodFieldName: select?.attributes['name'],
@@ -82,17 +108,36 @@ abstract final class GradesParser {
     );
   }
 
+  /// Évaluations annoncées par la page (barèmes ou coefficients) au-delà des
+  /// [understood] notes comprises.
+  static int countUnreadable(String html, int understood) {
+    final int scales = _scaleHint.allMatches(html).length;
+    final int coefficients = _coefficientHint.allMatches(html).length;
+    final int announced = scales > coefficients ? scales : coefficients;
+    return announced > understood ? announced - understood : 0;
+  }
+
   static List<Grade> parseGrades(String html) => [
         for (final RegExpMatch m in _gradeBlock.allMatches(html))
-          if (_number(m.group(1)!) case final double value)
-            Grade(
-              value: value,
-              coefficient: _number(m.group(2) ?? '') ?? 1,
-              subject: _text(m.group(3)!),
-              date: _parseDate(m.group(4) ?? ''),
-              type: _optionalText(m.group(5)),
-            ),
+          if (_grade(m) case final Grade grade) grade,
       ];
+
+  static Grade? _grade(RegExpMatch m) {
+    final String raw = _text(m.group(1)!);
+    final double? value = _number(raw);
+    final double? outOf = _number(m.group(2)!);
+    // Ni nombre ni mention, ou barème absurde : compté comme illisible.
+    if (raw.isEmpty || outOf == null || outOf <= 0) return null;
+    return Grade(
+      value: value,
+      mention: value == null ? raw : null,
+      outOf: outOf,
+      coefficient: _number(m.group(3) ?? '') ?? 1,
+      subject: _text(m.group(4)!),
+      date: _parseDate(m.group(5) ?? ''),
+      type: _optionalText(m.group(6)),
+    );
+  }
 
   static String? _optionalText(String? raw) {
     if (raw == null) return null;

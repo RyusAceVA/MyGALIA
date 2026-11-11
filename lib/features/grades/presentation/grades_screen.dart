@@ -52,6 +52,10 @@ class GradesScreen extends ConsumerWidget {
                 if (snapshot.grades.isEmpty) return const [_EmptyGrades()];
                 final GradeStats stats = GradeStats.of(snapshot.grades);
                 return [
+                  if (snapshot.unreadable > 0) ...[
+                    _UnreadableNotice(count: snapshot.unreadable),
+                    const SizedBox(height: 12),
+                  ],
                   _SummaryCard(stats: stats),
                   const SizedBox(height: 16),
                   const SectionTitle('Toutes les notes'),
@@ -244,7 +248,7 @@ class _StatColumn extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          value == null ? '—' : formatNumber(value.on20),
+          value?.on20 == null ? '—' : formatNumber(value!.on20!),
           style: theme.textTheme.headlineMedium?.copyWith(color: color, fontWeight: FontWeight.w700),
         ),
         if (value != null)
@@ -321,8 +325,46 @@ class GradeTile extends StatelessWidget {
             const SizedBox(width: 12),
             GradeShape(
               on20: grade.on20,
-              text: formatNumber(grade.value),
-              outOf: '/ ${formatNumber(grade.outOf)}',
+              text: grade.value == null
+                  ? (grade.mention ?? '—')
+                  : formatNumber(grade.value!),
+              outOf: grade.value == null ? null : '/ ${formatNumber(grade.outOf)}',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Des évaluations de la page n'ont pas été comprises : la moyenne affichée
+/// peut être incomplète, autant le dire.
+class _UnreadableNotice extends StatelessWidget {
+  const _UnreadableNotice({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? "1 évaluation de l'espace école n'a pas pu être lue : "
+                        'la moyenne peut être incomplète.'
+                    : "$count évaluations de l'espace école n'ont pas pu être "
+                        'lues : la moyenne peut être incomplète.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              ),
             ),
           ],
         ),
@@ -375,7 +417,9 @@ class GradeShape extends StatelessWidget {
   /// Valeur ramenée sur 20 (couleur et forme) ; nulle : neutre.
   final double? on20;
   final String text;
-  final String outOf;
+
+  /// Barème (« / 20 ») ; absent pour une mention sans note.
+  final String? outOf;
   final double size;
   final bool large;
 
@@ -402,11 +446,12 @@ class GradeShape extends StatelessWidget {
                 style: (large ? theme.textTheme.headlineMedium : theme.textTheme.titleMedium)
                     ?.copyWith(color: ink, fontWeight: FontWeight.w800, height: 1.1),
               ),
-              Text(
-                outOf,
-                style: (large ? theme.textTheme.labelLarge : theme.textTheme.labelSmall)
-                    ?.copyWith(color: ink.withValues(alpha: 0.8), height: 1.1),
-              ),
+              if (outOf case final String scale)
+                Text(
+                  scale,
+                  style: (large ? theme.textTheme.labelLarge : theme.textTheme.labelSmall)
+                      ?.copyWith(color: ink.withValues(alpha: 0.8), height: 1.1),
+                ),
             ],
           ),
         ),

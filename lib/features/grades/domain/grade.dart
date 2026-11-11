@@ -4,15 +4,19 @@ import 'package:flutter/foundation.dart';
 @immutable
 class Grade {
   const Grade({
-    required this.value,
+    this.value,
     required this.coefficient,
     required this.subject,
     this.outOf = 20,
     this.date,
     this.type,
-  });
+    this.mention,
+  }) : assert(value != null || mention != null, 'note ou mention requise');
 
-  final double value;
+  /// Note chiffrée ; `null` pour une évaluation sans note (voir [mention]).
+  final double? value;
+
+  /// Barème de la note (« /20 », « /10 »…).
   final double outOf;
   final double coefficient;
   final String subject;
@@ -21,8 +25,16 @@ class Grade {
   /// Nature de l'évaluation (« Devoir surveillé », « Oral »…).
   final String? type;
 
-  /// Note ramenée sur 20.
-  double get on20 => outOf == 0 ? 0 : value / outOf * 20;
+  /// Ce que l'école a écrit à la place d'une note chiffrée (« ABS »,
+  /// « DISP »…). Une telle évaluation est affichée mais ne compte dans
+  /// aucune moyenne.
+  final String? mention;
+
+  /// Note ramenée sur 20 ; `null` sans note chiffrée.
+  double? get on20 {
+    final double? v = value;
+    return v == null || outOf <= 0 ? null : v / outOf * 20;
+  }
 
   Map<String, Object?> toJson() => {
         'value': value,
@@ -31,13 +43,20 @@ class Grade {
         'subject': subject,
         'date': date?.toIso8601String(),
         'type': type,
+        'mention': mention,
       };
 
   /// Lève une erreur si le contenu est incomplet (cache corrompu).
   static Grade fromJson(Map<String, Object?> json) {
     final Object? date = json['date'];
+    final String? mention = json['mention'] as String?;
+    final num? value = json['value'] as num?;
+    if (value == null && mention == null) {
+      throw const FormatException('note sans valeur ni mention');
+    }
     return Grade(
-      value: (json['value']! as num).toDouble(),
+      value: value?.toDouble(),
+      mention: mention,
       outOf: (json['outOf']! as num).toDouble(),
       coefficient: (json['coefficient']! as num).toDouble(),
       subject: json['subject']! as String,
@@ -102,13 +121,15 @@ class GradeStats {
     Grade? best;
     Grade? worst;
     for (final Grade g in grades) {
-      final double on20 = g.on20;
+      // Absence, dispense… : listée, mais hors moyenne et hors extrêmes.
+      final double? on20 = g.on20;
+      if (on20 == null) continue;
       if (g.coefficient > 0) {
         weighted += on20 * g.coefficient;
         coefficients += g.coefficient;
       }
-      if (best == null || on20 > best.on20) best = g;
-      if (worst == null || on20 < worst.on20) worst = g;
+      if (best == null || on20 > best.on20!) best = g;
+      if (worst == null || on20 < worst.on20!) worst = g;
     }
     final List<Grade> byDate = List<Grade>.of(grades);
     // Tri stable (List.sort ne l'est pas) : du plus récent au plus ancien,
@@ -146,6 +167,7 @@ class GradesSnapshot {
     required this.periods,
     required this.selectedPeriod,
     required this.grades,
+    this.unreadable = 0,
   });
 
   final List<SchoolPeriod> periods;
@@ -154,10 +176,15 @@ class GradesSnapshot {
   final String? selectedPeriod;
   final List<Grade> grades;
 
+  /// Évaluations présentes sur la page mais non comprises (format inconnu) :
+  /// la moyenne affichée peut alors être incomplète.
+  final int unreadable;
+
   Map<String, Object?> toJson() => {
         'periods': [for (final SchoolPeriod p in periods) p.toJson()],
         'selectedPeriod': selectedPeriod,
         'grades': [for (final Grade g in grades) g.toJson()],
+        'unreadable': unreadable,
       };
 
   static GradesSnapshot fromJson(Map<String, Object?> json) => GradesSnapshot(
@@ -170,5 +197,6 @@ class GradesSnapshot {
           for (final Object? g in json['grades']! as List<Object?>)
             Grade.fromJson((g! as Map<Object?, Object?>).cast<String, Object?>()),
         ],
+        unreadable: (json['unreadable'] as num?)?.toInt() ?? 0,
       );
 }
