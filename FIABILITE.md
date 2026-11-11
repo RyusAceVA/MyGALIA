@@ -150,7 +150,8 @@ jamais de déconnexion forcée, seulement une erreur avec « Réessayer ».
 
 - Hive, boîte `cache_box_v2`, chiffrée en AES (clé dans le coffre). Une entrée = `{v: version, savedAt, data}`.
 - Clés : `planning:AAAA-M-J` (lundi de la semaine), `notes:courant` ou
-  `notes:<valeur du semestre>`.
+  `notes:<valeur du semestre>` pour le cursus par défaut, et
+  `notes:classe-<valeur>:…` pour un cursus choisi (jamais de mélange).
 - **Écriture uniquement après succès complet** : semaine entière parsée,
   page de notes reconnue. Une erreur (session, réseau, page vide, corrompue
   ou de connexion) laisse le dernier cache valide intact.

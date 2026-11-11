@@ -10,36 +10,73 @@ import 'package:mygalia/core/utils/date_format_fr.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
 import 'package:mygalia/features/grades/presentation/grades_controller.dart';
 
-/// Notes : semestres, moyenne générale, meilleure / plus basse note, liste.
+/// Notes : cursus, semestres, moyenne générale, meilleure / plus basse
+/// note, liste.
 class GradesScreen extends ConsumerWidget {
   const GradesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final String classValue = ref.watch(gradesClassProvider);
     final String period = ref.watch(gradesPeriodProvider);
-    final DataState<GradesSnapshot> state =
-        ref.watch(gradesControllerProvider(period));
+    final String key = gradesKey(classValue: classValue, period: period);
+    final DataState<GradesSnapshot> state = ref.watch(gradesControllerProvider(key));
     final GradesController controller =
-        ref.read(gradesControllerProvider(period).notifier);
-    // Lu sans condition : le provider (autoDispose) vit autant que l'écran.
-    final List<SchoolPeriod> known = ref.watch(knownPeriodsProvider);
-    final List<SchoolPeriod> current = state.data?.periods ?? const <SchoolPeriod>[];
-    // Pendant le chargement d'un autre semestre, le sélecteur reste affiché.
-    final List<SchoolPeriod> periods = current.isNotEmpty ? current : known;
-    final String? selected = period.isEmpty ? state.data?.selectedPeriod : period;
+        ref.read(gradesControllerProvider(key).notifier);
+    // Lus sans condition : les providers (autoDispose) vivent autant que
+    // l'écran.
+    final List<SchoolClass> knownClasses = ref.watch(knownClassesProvider);
+    final List<SchoolPeriod> knownPeriods = ref.watch(knownPeriodsProvider);
+    final GradesSnapshot? data = state.data;
+    // Pendant le chargement d'un autre choix, les sélecteurs restent
+    // affichés. Les semestres connus sont ceux du cursus affiché : ils
+    // disparaissent quand on change de cursus.
+    final List<SchoolClass> classes =
+        data != null && data.classes.isNotEmpty ? data.classes : knownClasses;
+    final List<SchoolPeriod> periods =
+        data != null && data.periods.isNotEmpty ? data.periods : knownPeriods;
+    final String? selectedClass = classValue.isEmpty ? data?.selectedClass : classValue;
+    final String? selectedPeriod = period.isEmpty ? data?.selectedPeriod : period;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notes')),
       body: Column(
         children: [
+          // Un seul cursus : rien à choisir.
+          if (classes.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: _ChoiceSelector(
+                semanticsLabel: 'Cursus',
+                choices: [
+                  for (final SchoolClass c in classes)
+                    _Choice(value: c.value, label: c.label, tooltip: c.label),
+                ],
+                selected: selectedClass,
+                onSelected: (String value) {
+                  if (value == selectedClass) return;
+                  ref.read(knownClassesProvider.notifier).state = classes;
+                  ref.read(knownPeriodsProvider.notifier).state = const <SchoolPeriod>[];
+                  ref.read(gradesPeriodProvider.notifier).state = '';
+                  ref.read(gradesClassProvider.notifier).state = value;
+                },
+              ),
+            ),
           if (periods.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: _PeriodSelector(
-                periods: periods,
-                selected: selected,
+              child: _ChoiceSelector(
+                semanticsLabel: 'Semestre',
+                choices: _periodChoices(periods),
+                selected: selectedPeriod,
                 onSelected: (String value) {
+                  ref.read(knownClassesProvider.notifier).state = classes;
                   ref.read(knownPeriodsProvider.notifier).state = periods;
+                  // Le cursus affiché est figé avec le semestre : sinon le
+                  // semestre serait cherché dans le cursus par défaut.
+                  if (classValue.isEmpty && classes.length > 1 && selectedClass != null) {
+                    ref.read(gradesClassProvider.notifier).state = selectedClass;
+                  }
                   ref.read(gradesPeriodProvider.notifier).state = value;
                 },
               ),
@@ -74,57 +111,95 @@ class GradesScreen extends ConsumerWidget {
   }
 }
 
-class _PeriodSelector extends StatelessWidget {
-  const _PeriodSelector({
-    required this.periods,
+/// Choix des semestres : le nom seul (« SEMESTRE 1 »), ou avec les années
+/// (« SEMESTRE 1 (2024-2025) ») si deux semestres portent le même nom.
+List<_Choice> _periodChoices(List<SchoolPeriod> periods) {
+  final Map<String, int> names = <String, int>{};
+  for (final SchoolPeriod p in periods) {
+    names[p.name] = (names[p.name] ?? 0) + 1;
+  }
+  return [
+    for (final SchoolPeriod p in periods)
+      _Choice(
+        value: p.value,
+        label: names[p.name]! > 1 ? p.shortLabel : p.name,
+        tooltip: p.label,
+      ),
+  ];
+}
+
+class _Choice {
+  const _Choice({required this.value, required this.label, required this.tooltip});
+
+  final String value;
+  final String label;
+  final String tooltip;
+}
+
+/// Sélecteur à choix unique : boutons segmentés, ou puces défilantes quand
+/// il y a trop de choix (ou des libellés trop longs) pour la largeur.
+class _ChoiceSelector extends StatelessWidget {
+  const _ChoiceSelector({
+    required this.semanticsLabel,
+    required this.choices,
     required this.selected,
     required this.onSelected,
   });
 
-  final List<SchoolPeriod> periods;
+  final String semanticsLabel;
+  final List<_Choice> choices;
   final String? selected;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final String? value = selected;
-    if (periods.length > 3) {
-      // Beaucoup de semestres : puces défilantes.
-      return SizedBox(
-        height: 48,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: [
-            for (final SchoolPeriod p in periods)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(p.name),
-                  selected: p.value == value,
-                  onSelected: (_) => onSelected(p.value),
+    final bool long = choices.any((_Choice c) => c.label.length > 14);
+    if (choices.length > 3 || (long && choices.length > 2)) {
+      return Semantics(
+        label: semanticsLabel,
+        container: true,
+        child: SizedBox(
+          height: 48,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final _Choice c in choices)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(c.label),
+                    tooltip: c.tooltip,
+                    selected: c.value == value,
+                    onSelected: (_) => onSelected(c.value),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       );
     }
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<String>(
-        showSelectedIcon: false,
-        emptySelectionAllowed: value == null,
-        segments: [
-          for (final SchoolPeriod p in periods)
-            ButtonSegment<String>(
-              value: p.value,
-              tooltip: p.label,
-              label: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-        ],
-        selected: value == null ? <String>{} : {value},
-        onSelectionChanged: (Set<String> selection) {
-          if (selection.isNotEmpty) onSelected(selection.first);
-        },
+    return Semantics(
+      label: semanticsLabel,
+      container: true,
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<String>(
+          showSelectedIcon: false,
+          emptySelectionAllowed: value == null,
+          segments: [
+            for (final _Choice c in choices)
+              ButtonSegment<String>(
+                value: c.value,
+                tooltip: c.tooltip,
+                label: Text(c.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          selected: value == null ? <String>{} : {value},
+          onSelectionChanged: (Set<String> selection) {
+            if (selection.isNotEmpty) onSelected(selection.first);
+          },
+        ),
       ),
     );
   }

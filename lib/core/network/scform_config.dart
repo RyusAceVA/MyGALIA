@@ -44,6 +44,9 @@ class ScFormConfig {
   /// Nom WebForms du sélecteur de semestre de la page des notes (§4.1 b).
   static const String periodSelectName = r'ctl00$MainContent$DropDownLstPeriode';
 
+  /// Fin du nom WebForms du sélecteur de classe (cursus) de la même page.
+  static const String classSelectSuffix = 'DropDownLstClasse';
+
   /// Redirections suivies au maximum pendant la poignée de main EDC (§2.2).
   static const int maxEdcHops = 8;
 

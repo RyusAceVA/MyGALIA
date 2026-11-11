@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:mygalia/core/debug/app_log.dart';
 import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/network/scform_config.dart';
 import 'package:mygalia/core/session/school_client.dart';
@@ -8,18 +9,21 @@ import 'package:mygalia/features/grades/data/grades_parser.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
 
 /// Récupération des notes (§4) : page WebForms `MesNotes.aspx`, avec
-/// postback pour changer de semestre.
+/// postback pour changer de classe (cursus) puis de semestre.
 class GradesRemoteDataSource {
   GradesRemoteDataSource(this._school);
 
   final SchoolClient _school;
 
-  /// Notes du semestre [periodValue] (vide : semestre affiché par défaut).
+  /// Notes de la classe [classValue] et du semestre [periodValue] (vides :
+  /// ce que l'espace école affiche par défaut).
   ///
-  /// GET puis, seulement si le semestre demandé diffère du semestre affiché,
-  /// postback. Si la session expire entre les deux, l'opération ENTIÈRE est
-  /// rejouée (le postback a besoin du formulaire de la même session).
+  /// GET puis, seulement si nécessaire, un postback pour la classe et un
+  /// pour le semestre, chacun rejouant le formulaire de la page précédente.
+  /// Si la session expire en route, l'opération ENTIÈRE est rejouée (un
+  /// postback a besoin du formulaire de la même session).
   Future<GradesSnapshot> fetch({
+    String classValue = '',
     String periodValue = '',
     CancelToken? cancelToken,
   }) {
@@ -27,9 +31,33 @@ class GradesRemoteDataSource {
       'notes',
       (SchoolRequester school) async {
         final Uri uri = school.galiaEdcUri(ScFormConfig.mesNotesPath);
-        final GradesPage page = GradesParser.parse(
+        GradesPage page = GradesParser.parse(
           await school.getPage(uri, marker: GradesParser.pageMarker),
         );
+        AppLog.session('page des notes : ${page.describe()}');
+
+        if (classValue.isNotEmpty && classValue != page.selectedClass) {
+          final FormSelect? select = page.classSelect;
+          if (select == null ||
+              !page.classes.any((SchoolClass c) => c.value == classValue)) {
+            throw const DataFailure(
+              'Ce cursus n\'est plus proposé par l\'espace école.',
+            );
+          }
+          page = GradesParser.parse(
+            await school.postForm(
+              uri,
+              page.postbackFor(select, classValue),
+              marker: GradesParser.pageMarker,
+            ),
+          );
+          if (page.selectedClass != classValue) {
+            throw const DataFailure(
+              'L\'espace école n\'a pas affiché le cursus demandé.',
+            );
+          }
+        }
+
         if (periodValue.isEmpty || periodValue == page.selectedPeriod) {
           return page.toSnapshot();
         }
@@ -40,15 +68,18 @@ class GradesRemoteDataSource {
         }
 
         // Postback (§4.2) : rejouer TOUT le formulaire, puis surcharger les
-        // trois valeurs qui simulent le changement du sélecteur.
-        final String target =
-            page.periodFieldName ?? ScFormConfig.periodSelectName;
-        final Map<String, String> form = Map<String, String>.of(page.formFields)
-          ..['__EVENTTARGET'] = target
-          ..['__EVENTARGUMENT'] = ''
-          ..[target] = periodValue;
+        // valeurs qui simulent le changement du sélecteur.
+        final FormSelect select = page.periodSelect ??
+            const FormSelect(
+              name: ScFormConfig.periodSelectName,
+              autoPostBack: true,
+            );
         final GradesPage switched = GradesParser.parse(
-          await school.postForm(uri, form, marker: GradesParser.pageMarker),
+          await school.postForm(
+            uri,
+            page.postbackFor(select, periodValue),
+            marker: GradesParser.pageMarker,
+          ),
         );
         if (switched.selectedPeriod != null &&
             switched.selectedPeriod != periodValue) {

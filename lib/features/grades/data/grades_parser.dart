@@ -5,6 +5,18 @@ import 'package:mygalia/core/network/failure.dart';
 import 'package:mygalia/core/network/scform_config.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
 
+/// Un sélecteur WebForms de la page des notes et la façon de le « changer ».
+class FormSelect {
+  const FormSelect({required this.name, required this.autoPostBack});
+
+  /// Nom WebForms réel (pour `__EVENTTARGET`).
+  final String name;
+
+  /// Vrai si le changer recharge la page tout seul (`onchange` appelant
+  /// `__doPostBack`) ; sinon il faut le bouton de validation du formulaire.
+  final bool autoPostBack;
+}
+
 /// Contenu utile d'une page `MesNotes.aspx`.
 class GradesPage {
   const GradesPage({
@@ -14,7 +26,23 @@ class GradesPage {
     required this.selectedPeriod,
     required this.periodFieldName,
     required this.formFields,
+    this.classes = const <SchoolClass>[],
+    this.selectedClass,
+    this.classSelect,
+    this.periodSelect,
+    this.submitButton,
   });
+
+  /// Classes (cursus) proposées, et celle affichée.
+  final List<SchoolClass> classes;
+  final String? selectedClass;
+
+  /// Sélecteurs de classe et de semestre, s'ils existent.
+  final FormSelect? classSelect;
+  final FormSelect? periodSelect;
+
+  /// Bouton de validation du formulaire (nom, valeur), s'il existe.
+  final MapEntry<String, String>? submitButton;
 
   final List<Grade> grades;
 
@@ -34,7 +62,48 @@ class GradesPage {
         selectedPeriod: selectedPeriod,
         grades: grades,
         unreadable: unreadable,
+        classes: classes,
+        selectedClass: selectedClass,
       );
+
+  /// Structure de la page, pour le journal de diagnostic : sélecteurs,
+  /// choix proposés (★ = affiché), mode de rechargement, bouton. Aucune
+  /// note, aucun champ de formulaire, aucun secret.
+  String describe() {
+    String mode(FormSelect? select) => select == null
+        ? 'absent'
+        : (select.autoPostBack ? 'rechargement auto' : 'sans rechargement auto');
+    final String classList = classes
+        .map((SchoolClass c) => '${c.value} « ${c.label} »${c.value == selectedClass ? ' ★' : ''}')
+        .join(', ');
+    final String periodList = periods
+        .map((SchoolPeriod p) => '${p.value} « ${p.label} »${p.value == selectedPeriod ? ' ★' : ''}')
+        .join(', ');
+    return 'classes [$classList] (${mode(classSelect)}) · '
+        'semestres [$periodList] (${mode(periodSelect)}) · '
+        'bouton ${submitButton?.key ?? 'absent'} · '
+        '${grades.length} note(s), $unreadable illisible(s)';
+  }
+
+  /// Champs à poster pour passer [select] à [value], comme le ferait le
+  /// navigateur : tout le formulaire, puis soit l'événement du sélecteur
+  /// (rechargement automatique), soit un clic sur le bouton de validation.
+  Map<String, String> postbackFor(FormSelect select, String value) {
+    final Map<String, String> form = Map<String, String>.of(formFields)
+      ..[select.name] = value;
+    final MapEntry<String, String>? button = submitButton;
+    if (select.autoPostBack || button == null) {
+      form
+        ..['__EVENTTARGET'] = select.name
+        ..['__EVENTARGUMENT'] = '';
+    } else {
+      form
+        ..['__EVENTTARGET'] = ''
+        ..['__EVENTARGUMENT'] = ''
+        ..[button.key] = button.value;
+    }
+    return form;
+  }
 }
 
 /// Parsing de la page des notes, formulaire ASP.NET WebForms (§4).
@@ -98,6 +167,7 @@ abstract final class GradesParser {
         'Le format de la page des notes a changé : notes illisibles.',
       );
     }
+    final Element? classSelect = _select(document, ScFormConfig.classSelectSuffix);
     return GradesPage(
       grades: grades,
       unreadable: unreadable,
@@ -105,8 +175,50 @@ abstract final class GradesParser {
       selectedPeriod: select == null ? null : _selectedValue(select),
       periodFieldName: select?.attributes['name'],
       formFields: extractFormFields(document),
+      classes: classSelect == null ? const <SchoolClass>[] : _classes(classSelect),
+      selectedClass: classSelect == null ? null : _selectedValue(classSelect),
+      classSelect: _formSelect(classSelect),
+      periodSelect: _formSelect(select),
+      submitButton: _submitButton(document),
     );
   }
+
+  static FormSelect? _formSelect(Element? select) {
+    final String? name = select?.attributes['name'];
+    if (select == null || name == null || name.isEmpty) return null;
+    return FormSelect(
+      name: name,
+      autoPostBack: (select.attributes['onchange'] ?? '').contains('__doPostBack'),
+    );
+  }
+
+  /// Bouton « Valider » du formulaire : le premier `submit` nommé.
+  static MapEntry<String, String>? _submitButton(Document document) {
+    for (final Element input in document.querySelectorAll('input')) {
+      final String? name = input.attributes['name'];
+      if ((input.attributes['type'] ?? '').toLowerCase() == 'submit' &&
+          name != null &&
+          name.isNotEmpty &&
+          !input.attributes.containsKey('disabled')) {
+        return MapEntry<String, String>(name, input.attributes['value'] ?? '');
+      }
+    }
+    return null;
+  }
+
+  static Element? _select(Document document, String suffix) => document
+      .querySelectorAll('select')
+      .where((Element s) => (s.attributes['name'] ?? '').endsWith(suffix))
+      .firstOrNull;
+
+  static List<SchoolClass> _classes(Element select) => [
+        for (final Element option in select.querySelectorAll('option'))
+          if ((option.attributes['value'] ?? '').isNotEmpty)
+            SchoolClass(
+              value: option.attributes['value']!,
+              label: _clean(option.text),
+            ),
+      ];
 
   /// Évaluations annoncées par la page (barèmes ou coefficients) au-delà des
   /// [understood] notes comprises.

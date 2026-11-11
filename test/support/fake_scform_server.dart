@@ -45,6 +45,14 @@ class FakeScFormServer {
   /// place du traitement normal : pare-feu, limite de débit…
   (int, String)? loginOverride;
 
+  /// Compte à deux cursus : la page des notes propose la nouvelle classe
+  /// (23, affichée par défaut) et l'ancienne (17).
+  bool twoClasses = false;
+
+  /// Vrai : changer de classe recharge la page (`onchange`). Faux : il faut
+  /// cliquer sur « Valider ».
+  bool classAutoPostBack = true;
+
   /// Retard de GetToken : élargit la fenêtre de concurrence des tests.
   Duration getTokenDelay = Duration.zero;
 
@@ -234,24 +242,49 @@ class FakeScFormServer {
         expireAfterNextNotesGet = false;
         expireSchoolSession();
       }
-      return _html(res, notesPageHtml(period: '30'));
+      final String classValue = twoClasses ? '23' : '17';
+      return _html(res, _notesPage(classValue, defaultPeriodOf(classValue)));
     }
     if (rest == ScFormConfig.mesNotesPath && req.method == 'POST') {
       final Map<String, String> form =
           Uri.splitQueryString(await utf8.decodeStream(req));
-      final bool valid =
-          form['__EVENTTARGET'] == ScFormConfig.periodSelectName &&
-              form['__VIEWSTATE'] == viewState &&
-              form['__EVENTVALIDATION'] == eventValidation &&
-              form[r'ctl00$MainContent$DropDownLstClasse'] == '17' &&
-              form[r'ctl00$MainContent$RadioButtonAffichage'] == '0' &&
-              !form.containsKey(r'ctl00$MainContent$BtnValider');
+      const String classSelect = r'ctl00$MainContent$DropDownLstClasse';
+      const String button = r'ctl00$MainContent$BtnValider';
+      // La classe de la page d'origine est portée par le __VIEWSTATE.
+      final String? origin = <String>['17', if (twoClasses) '23']
+          .where((String c) => form['__VIEWSTATE'] == viewStateOf(c))
+          .firstOrNull;
+      final String? classValue = form[classSelect];
       final String? period = form[ScFormConfig.periodSelectName];
-      if (!valid || (period != '30' && period != '31')) {
+      final String target = form['__EVENTTARGET'] ?? '';
+      final bool clicked = form.containsKey(button);
+      final bool valid = origin != null &&
+          form['__EVENTVALIDATION'] == eventValidation &&
+          form[r'ctl00$MainContent$RadioButtonAffichage'] == '0' &&
+          (classValue == '17' || (twoClasses && classValue == '23'));
+      if (!valid) {
         res.statusCode = 400; // « Invalid postback or callback argument »
         return;
       }
-      return _html(res, notesPageHtml(period: period!));
+      if (classValue != origin) {
+        // Changement de classe : par l'événement du sélecteur, ou par le
+        // bouton, selon la page servie.
+        final bool ok = classAutoPostBack
+            ? target == classSelect && !clicked
+            : target.isEmpty && clicked;
+        if (!ok) {
+          res.statusCode = 400;
+          return;
+        }
+        return _html(res, _notesPage(classValue!, defaultPeriodOf(classValue)));
+      }
+      if (target != ScFormConfig.periodSelectName ||
+          clicked ||
+          !periodsOf(classValue!).contains(period)) {
+        res.statusCode = 400;
+        return;
+      }
+      return _html(res, _notesPage(classValue, period!));
     }
     res.statusCode = 404;
   }
@@ -371,24 +404,63 @@ class FakeScFormServer {
 </tr></table></body></html>''';
   }
 
-  static String notesPageHtml({required String period}) {
-    final String grades = period == '31'
-        ? _gradeRow('15,5', '2,00', 'Anglais technique', 'REF ANG', '10/10/2025', 'Oral')
-        : _gradeRow('12.5', '1,00', 'Sensibilisation ITIL', 'REF ITIL', '19/09/2025', 'Devoir surveillé') +
-            _gradeRow('8', '1,00', 'R&#233;seaux', 'REF RES', '03/06/2025', 'TP not&#233;');
+  String _notesPage(String classValue, String period) => notesPageHtml(
+        period: period,
+        classValue: classValue,
+        twoClasses: twoClasses,
+        classAutoPostBack: classAutoPostBack,
+      );
+
+  /// Le `__VIEWSTATE` dépend de la classe affichée, comme sur le vrai site.
+  static String viewStateOf(String classValue) =>
+      classValue == '17' ? viewState : '${viewState}C$classValue';
+
+  static List<String> periodsOf(String classValue) =>
+      classValue == '23' ? const ['40'] : const ['31', '30'];
+
+  static String defaultPeriodOf(String classValue) =>
+      classValue == '23' ? '40' : '30';
+
+  /// Page des notes. Classe 17 (« TSRS1 ») : semestres 31 et 30. Classe 23
+  /// (« BSRC1 », second cursus) : semestre 40.
+  static String notesPageHtml({
+    required String period,
+    String classValue = '17',
+    bool twoClasses = false,
+    bool classAutoPostBack = true,
+  }) {
+    final String grades = switch (period) {
+      '40' => _gradeRow('14', '1,00', 'Cloud', 'REF CLOUD', '02/11/2026', 'Devoir surveillé'),
+      '31' => _gradeRow('15,5', '2,00', 'Anglais technique', 'REF ANG', '10/10/2025', 'Oral'),
+      _ => _gradeRow('12.5', '1,00', 'Sensibilisation ITIL', 'REF ITIL', '19/09/2025', 'Devoir surveillé') +
+          _gradeRow('8', '1,00', 'R&#233;seaux', 'REF RES', '03/06/2025', 'TP not&#233;'),
+    };
     String selected(String value) => value == period ? 'selected="selected" ' : '';
+    String selectedClass(String value) =>
+        value == classValue ? 'selected="selected" ' : '';
+    final String classChange = classAutoPostBack && twoClasses
+        ? ''' onchange="javascript:setTimeout('__doPostBack(\\'ctl00\$MainContent\$DropDownLstClasse\\',\\'\\')', 0)"'''
+        : '';
+    final String classOptions = twoClasses
+        ? '<option ${selectedClass('23')}value="23">BSRC1</option>'
+            '<option ${selectedClass('17')}value="17">TSRS1</option>'
+        : '<option selected="selected" value="17">TSRS1</option>';
+    final String periodOptions = classValue == '23'
+        ? '<option ${selected('40')}value="40">SEMESTRE 1 (du 14/09/2026 au 10/09/2027)</option>'
+        : '''
+  <option ${selected('31')}value="31">SEMESTRE 2 (du 29/09/2025 au 11/09/2026)</option>
+  <option ${selected('30')}value="30">SEMESTRE 1 (du 16/09/2024 au 19/09/2025)</option>''';
     return '''
 <html><body><form method="post" action="./MesNotes.aspx" id="form1">
 <input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
 <input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
-<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="$viewState" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="${viewStateOf(classValue)}" />
 <input type="hidden" name="__VIEWSTATEGENERATOR" value="472C7C7B" />
 <input type="hidden" name="__EVENTVALIDATION" value="$eventValidation" />
 <input type="hidden" name="ctl00\$Menu\$HF_EMAIL_COMPTE" value="prenom.nom@exemple.fr" />
-<select name="ctl00\$MainContent\$DropDownLstClasse"><option selected="selected" value="17">TSRS1</option></select>
+<select name="ctl00\$MainContent\$DropDownLstClasse"$classChange>$classOptions</select>
 <select name="ctl00\$MainContent\$DropDownLstPeriode" onchange="javascript:setTimeout('__doPostBack(\\'ctl00\$MainContent\$DropDownLstPeriode\\',\\'\\')', 0)">
-  <option ${selected('31')}value="31">SEMESTRE 2 (du 29/09/2025 au 11/09/2026)</option>
-  <option ${selected('30')}value="30">SEMESTRE 1 (du 16/09/2024 au 19/09/2025)</option>
+$periodOptions
 </select>
 <input type="radio" name="ctl00\$MainContent\$RadioButtonAffichage" value="0" checked="checked" />
 <input type="radio" name="ctl00\$MainContent\$RadioButtonAffichage" value="1" />

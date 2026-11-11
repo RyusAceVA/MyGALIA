@@ -110,6 +110,33 @@ class SchoolPeriod {
   int get hashCode => Object.hash(value, label);
 }
 
+/// Une classe proposée par le sélecteur de classe de la page des notes : un
+/// cursus suivi sur ce compte (« TSRS1 », puis la classe du cursus suivant).
+@immutable
+class SchoolClass {
+  const SchoolClass({required this.value, required this.label});
+
+  /// Valeur WebForms (ex. « 17 »).
+  final String value;
+
+  /// Libellé affiché par l'école (« TSRS1 »).
+  final String label;
+
+  Map<String, Object?> toJson() => {'value': value, 'label': label};
+
+  static SchoolClass fromJson(Map<String, Object?> json) => SchoolClass(
+        value: json['value']! as String,
+        label: json['label']! as String,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is SchoolClass && other.value == value && other.label == label;
+
+  @override
+  int get hashCode => Object.hash(value, label);
+}
+
 /// Synthèse d'un ensemble de notes (écran Notes, accueil).
 @immutable
 class GradeStats {
@@ -168,8 +195,17 @@ class GradesSnapshot {
     required this.selectedPeriod,
     required this.grades,
     this.unreadable = 0,
+    this.classes = const <SchoolClass>[],
+    this.selectedClass,
   });
 
+  /// Cursus du compte (vide si la page n'a pas de sélecteur de classe).
+  final List<SchoolClass> classes;
+
+  /// Valeur de la classe affichée.
+  final String? selectedClass;
+
+  /// Semestres de la classe affichée.
   final List<SchoolPeriod> periods;
 
   /// Valeur du semestre affiché (`null` si la page n'a pas de sélecteur).
@@ -185,6 +221,8 @@ class GradesSnapshot {
         'selectedPeriod': selectedPeriod,
         'grades': [for (final Grade g in grades) g.toJson()],
         'unreadable': unreadable,
+        'classes': [for (final SchoolClass c in classes) c.toJson()],
+        'selectedClass': selectedClass,
       };
 
   static GradesSnapshot fromJson(Map<String, Object?> json) => GradesSnapshot(
@@ -198,5 +236,10 @@ class GradesSnapshot {
             Grade.fromJson((g! as Map<Object?, Object?>).cast<String, Object?>()),
         ],
         unreadable: (json['unreadable'] as num?)?.toInt() ?? 0,
+        classes: [
+          for (final Object? c in json['classes'] as List<Object?>? ?? const <Object?>[])
+            SchoolClass.fromJson((c! as Map<Object?, Object?>).cast<String, Object?>()),
+        ],
+        selectedClass: json['selectedClass'] as String?,
       );
 }

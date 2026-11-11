@@ -23,15 +23,21 @@ class GradesRepository {
   final SessionManager _sessions;
   final DateTime Function() _clock;
 
-  /// [periodValue] vide : semestre affiché par défaut par l'espace école.
-  static String _key(String periodValue) =>
-      'notes:${periodValue.isEmpty ? 'courant' : periodValue}';
+  /// Une entrée par classe (cursus) et par semestre : les notes de deux
+  /// cursus ne se mélangent jamais. Valeurs vides : ce que l'espace école
+  /// affiche par défaut.
+  static String _key(String periodValue, String classValue) => [
+        'notes',
+        if (classValue.isNotEmpty) 'classe-$classValue',
+        periodValue.isEmpty ? 'courant' : periodValue,
+      ].join(':');
 
-  CachedValue<GradesSnapshot>? cached(String periodValue) {
+  CachedValue<GradesSnapshot>? cached(String periodValue, {String classValue = ''}) {
+    final String key = _key(periodValue, classValue);
     final CachedValue<GradesSnapshot>? cached =
-        _cache.read(_key(periodValue), GradesSnapshot.fromJson);
+        _cache.read(key, GradesSnapshot.fromJson);
     AppLog.cache(
-      '${_key(periodValue)} : ${cached == null ? 'absent du cache' : 'cache du ${cached.savedAt}'}',
+      '$key : ${cached == null ? 'absent du cache' : 'cache du ${cached.savedAt}'}',
     );
     return cached;
   }
@@ -39,18 +45,21 @@ class GradesRepository {
   /// Interroge TOUJOURS le réseau ; n'enregistre que des notes valides.
   Future<CachedValue<GradesSnapshot>> fetch(
     String periodValue, {
+    String classValue = '',
     CancelToken? cancelToken,
   }) async {
-    AppLog.cache('${_key(periodValue)} : réseau');
+    final String key = _key(periodValue, classValue);
+    AppLog.cache('$key : réseau');
     final int epoch = _sessions.epoch;
     final GradesSnapshot snapshot = await _remote.fetch(
+      classValue: classValue,
       periodValue: periodValue,
       cancelToken: cancelToken,
     );
     // Déconnexion pendant le chargement : rien ne doit rester sur le disque.
     if (_sessions.epoch != epoch) throw const CancelledFailure();
     final DateTime savedAt = _clock();
-    await _cache.write(_key(periodValue), snapshot.toJson(), savedAt);
+    await _cache.write(key, snapshot.toJson(), savedAt);
     return CachedValue<GradesSnapshot>(snapshot, savedAt);
   }
 }
