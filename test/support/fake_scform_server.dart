@@ -41,6 +41,10 @@ class FakeScFormServer {
   /// Corps servi à la place du planning (page vide, contenu corrompu…).
   String? planningBodyOverride;
 
+  /// Réponse imposée à la prochaine connexion API (statut, corps), à la
+  /// place du traitement normal : pare-feu, limite de débit…
+  (int, String)? loginOverride;
+
   /// Retard de GetToken : élargit la fenêtre de concurrence des tests.
   Duration getTokenDelay = Duration.zero;
 
@@ -139,6 +143,11 @@ class FakeScFormServer {
 
   Future<void> _login(HttpRequest req) async {
     loginCalls++;
+    final (int, String)? forced = loginOverride;
+    if (forced != null) {
+      req.response.statusCode = forced.$1;
+      return _html(req.response, forced.$2);
+    }
     final String body = await utf8.decodeStream(req);
     final Map<String, Object?> json =
         (jsonDecode(body) as Map<Object?, Object?>).cast<String, Object?>();

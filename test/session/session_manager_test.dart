@@ -103,6 +103,49 @@ void main() {
     expect(await lost, isA<InvalidCredentialsFailure>());
   });
 
+  for (final (int status, String body, String label) in <(int, String, String)>[
+    (403, '<html><body>Access denied</body></html>', '403 pare-feu'),
+    (400, '', '400 sans corps'),
+    (400, '{"title":"One or more validation errors occurred.","errors":{"email":["x"]}}',
+        '400 de validation'),
+  ]) {
+    test('connexion bloquée ($label) : ni déconnexion ni coffre effacé', () async {
+      await env.school.run('test', _planningPage);
+      bool lost = false;
+      env.sessions.sessionLost.listen((_) => lost = true);
+      env.server
+        ..loginOverride = (status, body)
+        ..expireApiTokens()
+        ..expireSchoolSession();
+
+      await expectLater(
+        env.school.run('test', _planningPage),
+        throwsA(isA<ServerFailure>()),
+      );
+
+      expect(await env.vault.readCredentials(), isNotNull);
+      expect(lost, isFalse);
+
+      // Blocage levé : tout repart sans nouvelle saisie.
+      env.server.loginOverride = null;
+      expect(await env.school.run('test', _planningPage), contains('Bouton_Info'));
+    });
+  }
+
+  test('403 JSON, donc écrit par SC Form : identifiants refusés', () async {
+    await env.school.run('test', _planningPage);
+    env.server
+      ..loginOverride = (403, '{"message":"Compte désactivé"}')
+      ..expireApiTokens()
+      ..expireSchoolSession();
+
+    await expectLater(
+      env.school.run('test', _planningPage),
+      throwsA(isA<InvalidCredentialsFailure>()),
+    );
+    expect(await env.vault.readCredentials(), isNull);
+  });
+
   test('jeton API expiré côté serveur : nouvelle connexion API puis succès', () async {
     await env.school.run('test', _planningPage);
     env.server

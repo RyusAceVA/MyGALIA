@@ -138,15 +138,17 @@ session est toujours la session courante.
 
 ### 2.6 Qui déconnecte l'utilisateur ?
 
-**Seulement** des identifiants refusés par SC Form (400/401/403 au login)
-ou absents du coffre. `SessionManager` purge alors le coffre et émet
+**Seulement** des identifiants refusés par SC Form ou absents du coffre.
+Un refus compte s'il vient de l'API elle-même : 401, ou 400/403 dont le corps
+est un objet JSON (hors erreur de validation `errors`). Un 400/403 en HTML ou
+sans corps (pare-feu, limite de débit) est une erreur serveur ordinaire. `SessionManager` purge alors le coffre et émet
 `sessionLost` ; `AuthController` purge le reste et affiche l'écran de
 connexion avec le message. Réseau, serveur, session école, page illisible :
 jamais de déconnexion forcée, seulement une erreur avec « Réessayer ».
 
 ## 3. Cache
 
-- Hive, boîte `cache_box`. Une entrée = `{v: version, savedAt, data}`.
+- Hive, boîte `cache_box_v2`, chiffrée en AES (clé dans le coffre). Une entrée = `{v: version, savedAt, data}`.
 - Clés : `planning:AAAA-M-J` (lundi de la semaine), `notes:courant` ou
   `notes:<valeur du semestre>`.
 - **Écriture uniquement après succès complet** : semaine entière parsée,

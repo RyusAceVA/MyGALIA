@@ -48,7 +48,9 @@ class AuthRepository {
   /// `POST /Account/Login?DoubleAuth=true`.
   ///
   /// Lève [InvalidCredentialsFailure] si SC Form refuse les identifiants :
-  /// cette erreur n'est jamais relancée automatiquement.
+  /// cette erreur n'est jamais relancée automatiquement. Un 400 ou un 403 qui
+  /// ne vient pas de l'API elle-même (voir [_refusesCredentials]) lève une
+  /// [ServerFailure] : il ne doit ni déconnecter ni effacer le coffre.
   Future<ApiToken> login(Credentials credentials, {CancelToken? cancelToken}) {
     return _retry.run(
       'connexion API',
@@ -84,10 +86,23 @@ class AuthRepository {
           );
         }
         if (status == 400 || status == 401 || status == 403) {
-          AppLog.auth('connexion API refusée (HTTP $status)');
-          throw InvalidCredentialsFailure(
-            _serverMessage(response.data) ??
-                'Identifiant ou mot de passe refusé par SC Form.',
+          if (_refusesCredentials(status, response.data)) {
+            AppLog.auth('connexion API refusée (HTTP $status)');
+            throw InvalidCredentialsFailure(
+              _serverMessage(response.data) ??
+                  'Identifiant ou mot de passe refusé par SC Form.',
+              code: status,
+            );
+          }
+          // Blocage en amont de l'API (pare-feu, limite de débit) ou requête
+          // jugée mal formée : rien ne dit que le mot de passe est faux.
+          AppLog.auth(
+            'connexion API bloquée (HTTP $status) sans verdict sur les '
+            'identifiants',
+          );
+          throw ServerFailure(
+            'SC Form a bloqué la connexion sans se prononcer sur vos '
+            'identifiants (erreur $status). Réessayez plus tard.',
             code: status,
           );
         }
@@ -135,6 +150,26 @@ class AuthRepository {
       );
     }
     return transition;
+  }
+
+  /// Vrai si la réponse est un verdict de l'API sur les identifiants.
+  ///
+  ///  * 401 : toujours ;
+  ///  * 400 / 403 : seulement si le corps est un objet JSON, donc écrit par
+  ///    l'API. Une page HTML ou un corps vide viennent d'un intermédiaire
+  ///    (pare-feu, limite de débit, maintenance). Un 400 de validation
+  ///    ASP.NET (clé `errors`) signale une requête mal formée, pas un mauvais
+  ///    mot de passe.
+  static bool _refusesCredentials(int status, String? body) {
+    if (status == 401) return true;
+    if (body == null || body.trim().isEmpty) return false;
+    final Object? json;
+    try {
+      json = jsonDecode(body);
+    } on FormatException {
+      return false;
+    }
+    return json is Map && json['errors'] is! Map;
   }
 
   static Future<Response<String>> _guard(
