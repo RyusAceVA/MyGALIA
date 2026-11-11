@@ -1,0 +1,39 @@
+# Vérifications à chaque poussée et à chaque demande de fusion : analyse
+# statique et tests. Les tests tournent contre un faux serveur local : aucun
+# identifiant n'est nécessaire, et le portail de l'école n'est jamais appelé.
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Analyse et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.4
+          cache: true
+
+      - name: Dépendances
+        run: flutter pub get
+
+      - name: Analyse statique
+        run: flutter analyze
+
+      - name: Tests
+        run: flutter test
