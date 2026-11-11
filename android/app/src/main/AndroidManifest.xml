@@ -3,6 +3,9 @@
          déclarent par défaut. Sans elle, un APK release n'émet AUCUNE requête
          réseau (échec systématique, « Réessayer » compris). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Notifications (nouvelle note, rappel du vendredi) : demandée à
+         l'utilisateur seulement quand il en active une (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="MyGalia"
         android:name="${applicationName}"

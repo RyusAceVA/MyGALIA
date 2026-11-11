@@ -53,6 +53,9 @@ class FakeScFormServer {
   /// cliquer sur « Valider ».
   bool classAutoPostBack = true;
 
+  /// Une note de plus dans le semestre 40 (nouvelle note publiée).
+  bool extraGrade = false;
+
   /// Retard de GetToken : élargit la fenêtre de concurrence des tests.
   Duration getTokenDelay = Duration.zero;
 
@@ -409,6 +412,7 @@ class FakeScFormServer {
         classValue: classValue,
         twoClasses: twoClasses,
         classAutoPostBack: classAutoPostBack,
+        extraGrade: extraGrade,
       );
 
   /// Le `__VIEWSTATE` dépend de la classe affichée, comme sur le vrai site.
@@ -428,9 +432,11 @@ class FakeScFormServer {
     String classValue = '17',
     bool twoClasses = false,
     bool classAutoPostBack = true,
+    bool extraGrade = false,
   }) {
     final String grades = switch (period) {
-      '40' => _gradeRow('14', '1,00', 'Cloud', 'REF CLOUD', '02/11/2026', 'Devoir surveillé'),
+      '40' => _gradeRow('14', '1,00', 'Cloud', 'REF CLOUD', '02/11/2026', 'Devoir surveillé') +
+          (extraGrade ? _gradeRow('16', '1,00', 'S&#233;curit&#233;', 'REF SEC', '09/11/2026', 'Oral') : ''),
       '31' => _gradeRow('15,5', '2,00', 'Anglais technique', 'REF ANG', '10/10/2025', 'Oral'),
       _ => _gradeRow('12.5', '1,00', 'Sensibilisation ITIL', 'REF ITIL', '19/09/2025', 'Devoir surveillé') +
           _gradeRow('8', '1,00', 'R&#233;seaux', 'REF RES', '03/06/2025', 'TP not&#233;'),

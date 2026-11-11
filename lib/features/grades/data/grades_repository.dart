@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +9,7 @@ import 'package:mygalia/core/session/session_manager.dart';
 import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/features/grades/data/grades_remote_data_source.dart';
 import 'package:mygalia/features/grades/domain/grade.dart';
+import 'package:mygalia/features/notifications/data/notification_store.dart';
 
 /// Notes : le réseau fait foi, le cache sert à l'affichage immédiat et de
 /// secours hors ligne.
@@ -16,7 +19,12 @@ class GradesRepository {
     this._cache,
     this._sessions, {
     DateTime Function()? clock,
+    this.onCurrentGrades,
   }) : _clock = clock ?? DateTime.now;
+
+  /// Appelé avec les notes du cursus et du semestre par défaut, une fois
+  /// chargées : elles sont « vues », donc jamais annoncées en notification.
+  final void Function(List<Grade> grades)? onCurrentGrades;
 
   final GradesRemoteDataSource _remote;
   final CacheStore _cache;
@@ -60,6 +68,9 @@ class GradesRepository {
     if (_sessions.epoch != epoch) throw const CancelledFailure();
     final DateTime savedAt = _clock();
     await _cache.write(key, snapshot.toJson(), savedAt);
+    if (periodValue.isEmpty && classValue.isEmpty) {
+      onCurrentGrades?.call(snapshot.grades);
+    }
     return CachedValue<GradesSnapshot>(snapshot, savedAt);
   }
 }
@@ -69,5 +80,11 @@ final gradesRepositoryProvider = Provider<GradesRepository>((ref) {
     ref.watch(gradesRemoteDataSourceProvider),
     ref.watch(cacheStoreProvider),
     ref.watch(sessionManagerProvider),
+    onCurrentGrades: (List<Grade> grades) {
+      // Sans attendre, et sans jamais faire échouer un chargement réussi.
+      unawaited(
+        ref.read(notificationStoreProvider).markSeen(grades).catchError((Object _) {}),
+      );
+    },
   );
 });

@@ -307,3 +307,21 @@ Build debug branché à Android Studio (journal : onglet Logcat, filtre
 | Mauvais mot de passe | Se déconnecter, se reconnecter avec un mot de passe faux | Message clair, une seule tentative ; avec le bon mot de passe : connexion normale |
 | Mot de passe changé sur le portail | Changer le mot de passe sur SC Form, attendre l'expiration ou utiliser « Invalider aussi le jeton API » | Retour à l'écran de connexion avec le message du serveur |
 | Serveur lent | Réseau très faible (ex. 2G / mode développeur « réseau lent ») | Indicateur de chargement, puis données ; au-delà de 20 s sans réponse : jusqu'à 2 relances (1 s puis 3 s), puis « Serveur trop lent » + Réessayer, jamais d'écran figé |
+
+## Notifications et tâche de fond
+
+- Deux notifications, coupées par défaut : nouvelle note, rappel du vendredi.
+- `WorkManager` lance `NotificationChecker` toutes les 6 heures environ,
+  seulement avec du réseau ; l'instant exact est choisi par Android.
+- La tâche de fond tourne dans un autre isolat : elle **ne touche jamais au
+  cache Hive**. Réglages et mémoire (empreintes des notes déjà vues, semaine
+  déjà rappelée) sont dans le coffre, lisible des deux côtés.
+- Nouvelle note : une requête par vérification (cursus et semestre affichés
+  par défaut). La première liste vue sert de point de départ, sans rien
+  annoncer. Une note vue dans l'app n'est pas annoncée ensuite.
+- Rappel du vendredi : du vendredi 12 h au dimanche, la semaine suivante est
+  demandée **une seule fois** (5 requêtes) ; rappel seulement si elle
+  contient de vrais cours.
+- Une erreur ne déclenche aucune relance propre à la tâche : elle attend la
+  vérification suivante. Déconnecté, la tâche ne fait aucune requête.
+- Déconnexion : vérification annulée, réglages et mémoire effacés.

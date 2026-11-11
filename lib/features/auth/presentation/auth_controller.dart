@@ -8,6 +8,8 @@ import 'package:mygalia/core/session/session_manager.dart';
 import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/core/storage/secure_storage_service.dart';
 import 'package:mygalia/features/auth/data/auth_repository.dart';
+import 'package:mygalia/features/notifications/data/notification_gateway.dart';
+import 'package:mygalia/features/notifications/presentation/notification_settings_controller.dart';
 
 /// État de connexion de l'utilisateur.
 sealed class AuthState {
@@ -96,12 +98,16 @@ class AuthController extends Notifier<AuthState> {
   ///    déconnexion, aucune reconnexion n'est tentée ;
   ///  * coffre vidé : identifiants, jeton API, session école (cookies,
   ///    segment, pkEntite) ;
-  ///  * cache Hive vidé : planning et notes.
+  ///  * cache Hive vidé : planning et notes ;
+  ///  * vérification en arrière-plan annulée, réglages et mémoire des
+  ///    notifications effacés avec le coffre.
   /// Les écrans de données, détruits avec l'écran principal, annulent leurs
   /// requêtes en cours.
   Future<void> _purge({required bool signedIn}) async {
     ref.read(sessionManagerProvider).reset(signedIn: signedIn);
     await ref.read(secureStorageServiceProvider).clearAll();
     await ref.read(cacheStoreProvider).clear();
+    await ref.read(backgroundSchedulerProvider).disable();
+    ref.invalidate(notificationSettingsProvider);
   }
 }

@@ -7,6 +7,7 @@ import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/debug/app_log.dart';
 import 'package:mygalia/core/storage/cache_box.dart';
 import 'package:mygalia/core/storage/secure_storage_service.dart';
+import 'package:mygalia/features/notifications/background/background_tasks.dart';
 
 /// Point d'entrée de MyGalia.
 ///
@@ -28,6 +29,10 @@ Future<void> main() async {
     AppConstants.cacheBox,
     SecureStorageService(const FlutterSecureKeyValueStore()),
   );
+
+  // Déclare la tâche de fond des notifications (programmée seulement si
+  // l'utilisateur en active une dans les Paramètres).
+  await initializeBackgroundTasks();
 
   // ProviderScope : conteneur racine de Riverpod. Indispensable pour que
   // n'importe quel widget descendant puisse lire/observer des providers.

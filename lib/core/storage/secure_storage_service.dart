@@ -108,6 +108,7 @@ class SecureStorageService {
   static const String _kApiToken = 'mygalia.api_token';
   static const String _kEdcSession = 'mygalia.edc_session';
   static const String _kCacheKey = 'mygalia.cache_key';
+  static const String _kNotifications = 'mygalia.notifications';
 
   Future<Credentials?> readCredentials() async {
     final Map<String, Object?>? json = await _readJson(_kCredentials);
@@ -155,7 +156,15 @@ class SecureStorageService {
     await _delete(_kCredentials);
     await _delete(_kApiToken);
     await _delete(_kEdcSession);
+    await _delete(_kNotifications);
   }
+
+  /// Réglages et mémoire des notifications (voir `NotificationState`).
+  Future<Map<String, Object?>?> readNotificationState() =>
+      _readJson(_kNotifications);
+
+  Future<void> saveNotificationState(Map<String, Object?> json) =>
+      _writeJson(_kNotifications, json);
 
   /// Clé AES-256 du cache local (planning, notes), créée au premier appel.
   /// `null` si le coffre est indisponible : l'appelant ne doit alors rien

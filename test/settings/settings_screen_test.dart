@@ -54,6 +54,11 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    // Écran haut : toutes les cartes (dont Notifications) sont construites.
+    tester.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -63,6 +68,8 @@ void main() {
 
     expect(find.text('Étudiant SC-Form'), findsOneWidget);
     expect(find.text('Vider le cache local'), findsOneWidget);
+    expect(find.text('Nouvelles notes'), findsOneWidget);
+    expect(find.text('Rappel du vendredi'), findsOneWidget);
     expect(find.text('Se déconnecter'), findsOneWidget);
 
     await tester.tap(find.text('Sombre'));

@@ -13,6 +13,8 @@ import 'package:mygalia/core/storage/cache_store.dart';
 import 'package:mygalia/features/auth/presentation/auth_controller.dart';
 import 'package:mygalia/features/auth/presentation/sign_out_dialog.dart';
 import 'package:mygalia/features/grades/presentation/grades_controller.dart';
+import 'package:mygalia/features/notifications/domain/notification_state.dart';
+import 'package:mygalia/features/notifications/presentation/notification_settings_controller.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_controller.dart';
 
 /// Paramètres : profil, apparence, données (cache, déconnexion).
@@ -113,6 +115,9 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          const SectionTitle('Notifications'),
+          const _NotificationCard(),
+          const SizedBox(height: 16),
           const SectionTitle('Données'),
           Card(
             child: Column(
@@ -183,6 +188,68 @@ class SettingsScreen extends ConsumerWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Cache local vidé.')),
+    );
+  }
+}
+
+/// Interrupteurs des notifications. Vérification en arrière-plan quelques
+/// fois par jour : une note est annoncée dans les heures qui suivent.
+class _NotificationCard extends ConsumerWidget {
+  const _NotificationCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final NotificationState state =
+        ref.watch(notificationSettingsProvider).valueOrNull ?? const NotificationState();
+    final NotificationSettingsController controller =
+        ref.read(notificationSettingsProvider.notifier);
+
+    Future<void> change(Future<bool> Function() apply) async {
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      if (await apply()) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notifications refusées. Autorisez-les pour MyGalia dans les '
+              'réglages Android.',
+            ),
+          ),
+        );
+    }
+
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: _SettingShape(
+              shape: MaterialShapes.cookie9,
+              icon: Icons.school_outlined,
+              fill: theme.colorScheme.primaryContainer,
+              ink: theme.colorScheme.onPrimaryContainer,
+            ),
+            title: const Text('Nouvelles notes'),
+            subtitle: const Text('Prévenir quand une note est publiée'),
+            value: state.newGrades,
+            onChanged: (bool value) => change(() => controller.setNewGrades(value)),
+          ),
+          const Divider(indent: 16, endIndent: 16),
+          SwitchListTile(
+            secondary: _SettingShape(
+              shape: MaterialShapes.pentagon,
+              icon: Icons.event_repeat_outlined,
+              fill: theme.colorScheme.secondaryContainer,
+              ink: theme.colorScheme.onSecondaryContainer,
+            ),
+            title: const Text('Rappel du vendredi'),
+            subtitle: const Text("Cours à l'école la semaine suivante"),
+            value: state.fridayReminder,
+            onChanged: (bool value) => change(() => controller.setFridayReminder(value)),
+          ),
+        ],
+      ),
     );
   }
 }
