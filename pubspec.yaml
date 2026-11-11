@@ -31,7 +31,6 @@ dependencies:
   hive_flutter: ^1.1.0 # Intégration Hive <-> Flutter (init, path)
 
   # --- UI / Design ---------------------------------------------------------
-  google_fonts: ^6.2.1 # Typographies (Inter / Space Grotesk)
 
 # ---------------------------------------------------------------------------
 # Dépendances de développement (codegen, lint, tests)
@@ -57,7 +56,27 @@ dev_dependencies:
 # ---------------------------------------------------------------------------
 flutter:
   uses-material-design: true
-  # Décommenter au fur et à mesure de l'ajout des assets :
-  # assets:
-  #   - assets/icons/
-  #   - assets/images/
+
+  # Polices embarquées (licence OFL, voir assets/fonts/OFL-*.txt) : aucun
+  # téléchargement au lancement, même rendu hors ligne.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700

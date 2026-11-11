@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:mygalia/core/theme/app_colors.dart';
 import 'package:mygalia/core/theme/app_radius.dart';
@@ -18,6 +17,10 @@ import 'package:mygalia/core/theme/app_radius.dart';
 abstract final class AppTheme {
   AppTheme._();
 
+  /// Familles déclarées dans `pubspec.yaml`.
+  static const String bodyFont = 'Inter';
+  static const String titleFont = 'SpaceGrotesk';
+
   static ThemeData get light => _build(AppColors.light);
   static ThemeData get dark => _build(AppColors.dark);
 
@@ -29,17 +32,21 @@ abstract final class AppTheme {
     final bool isDark = scheme.brightness == Brightness.dark;
 
     // Typographie : on part du textTheme M3 par défaut adapté au brightness,
-    // puis on applique les deux familles Google Fonts.
+    // puis on applique les deux familles, embarquées dans l'app
+    // (assets/fonts) : aucun téléchargement, même rendu hors ligne.
     final TextTheme baseText =
         (isDark ? Typography.material2021().white : Typography.material2021().black);
-    final TextTheme textTheme = GoogleFonts.interTextTheme(baseText).copyWith(
-      displayLarge: GoogleFonts.spaceGrotesk(textStyle: baseText.displayLarge, fontWeight: FontWeight.w700),
-      displayMedium: GoogleFonts.spaceGrotesk(textStyle: baseText.displayMedium, fontWeight: FontWeight.w700),
-      displaySmall: GoogleFonts.spaceGrotesk(textStyle: baseText.displaySmall, fontWeight: FontWeight.w600),
-      headlineLarge: GoogleFonts.spaceGrotesk(textStyle: baseText.headlineLarge, fontWeight: FontWeight.w600),
-      headlineMedium: GoogleFonts.spaceGrotesk(textStyle: baseText.headlineMedium, fontWeight: FontWeight.w600),
-      headlineSmall: GoogleFonts.spaceGrotesk(textStyle: baseText.headlineSmall, fontWeight: FontWeight.w600),
-      titleLarge: GoogleFonts.spaceGrotesk(textStyle: baseText.titleLarge, fontWeight: FontWeight.w600),
+    TextStyle? title(TextStyle? style, FontWeight weight) =>
+        style?.copyWith(fontFamily: titleFont, fontWeight: weight);
+    final TextTheme body = baseText.apply(fontFamily: bodyFont);
+    final TextTheme textTheme = body.copyWith(
+      displayLarge: title(body.displayLarge, FontWeight.w700),
+      displayMedium: title(body.displayMedium, FontWeight.w700),
+      displaySmall: title(body.displaySmall, FontWeight.w600),
+      headlineLarge: title(body.headlineLarge, FontWeight.w600),
+      headlineMedium: title(body.headlineMedium, FontWeight.w600),
+      headlineSmall: title(body.headlineSmall, FontWeight.w600),
+      titleLarge: title(body.titleLarge, FontWeight.w600),
     );
 
     return ThemeData(
