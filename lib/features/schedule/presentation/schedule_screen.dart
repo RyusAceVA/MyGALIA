@@ -7,6 +7,7 @@ import 'package:mygalia/core/presentation/expressive/material_shapes.dart';
 import 'package:mygalia/core/presentation/expressive/shape_badge.dart';
 import 'package:mygalia/core/presentation/widgets/data_state_view.dart';
 import 'package:mygalia/core/utils/date_format_fr.dart';
+import 'package:mygalia/features/schedule/data/calendar_exporter.dart';
 import 'package:mygalia/features/schedule/domain/course.dart';
 import 'package:mygalia/features/schedule/presentation/period_jump_controller.dart';
 import 'package:mygalia/features/schedule/presentation/schedule_controller.dart';
@@ -33,6 +34,11 @@ class ScheduleScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Emploi du temps'),
         actions: [
+          IconButton(
+            tooltip: "Exporter la semaine vers l'agenda",
+            icon: const Icon(Icons.event_available_outlined),
+            onPressed: () => _export(context, ref, state.data),
+          ),
           IconButton(
             tooltip: 'Choisir une date',
             icon: const Icon(Icons.calendar_month_outlined),
@@ -110,6 +116,30 @@ class ScheduleScreen extends ConsumerWidget {
           child: CourseTile(course: course),
         ),
     ];
+  }
+
+  /// Remet les cours de la semaine affichée à l'agenda du téléphone.
+  static Future<void> _export(
+    BuildContext context,
+    WidgetRef ref,
+    WeekSchedule? week,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    void say(String message) => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+    if (week == null) {
+      say("Le planning de cette semaine n'est pas encore chargé.");
+      return;
+    }
+    switch (await ref.read(calendarExporterProvider)(week)) {
+      case CalendarExportResult.shared:
+        break;
+      case CalendarExportResult.nothingToExport:
+        say('Aucun cours à exporter cette semaine.');
+      case CalendarExportResult.failed:
+        say('Export impossible. Réessayez.');
+    }
   }
 
   static Future<void> _pickDate(

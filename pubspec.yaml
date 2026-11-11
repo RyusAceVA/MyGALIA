@@ -29,6 +29,10 @@ dependencies:
   flutter_secure_storage: ^9.2.2 # Secrets sensibles (tokens, credentials)
   hive: ^2.2.3 # Base clé/valeur locale rapide (cache)
   hive_flutter: ^1.1.0 # Intégration Hive <-> Flutter (init, path)
+  share_plus: ^12.0.2
+  path_provider: ^2.1.6
+  flutter_local_notifications: ^23.0.1
+  workmanager: ^0.10.10
 
   # --- UI / Design ---------------------------------------------------------
 
