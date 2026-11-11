@@ -3,7 +3,7 @@ description: "MyGalia — alternative moderne à SC-Form (Material 3 Expressive)
 publish_to: "none"
 
 # Version applicative (SemVer + build number après le +)
-version: 0.1.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

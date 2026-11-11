@@ -1,0 +1,8 @@
+# Copier ce fichier en « key.properties » (ignoré par git) et le remplir.
+# Ne jamais commiter key.properties ni le fichier .jks.
+#
+# storeFile : chemin de la clé, relatif au dossier android/ (ou absolu).
+storeFile=../mygalia-release.jks
+storePassword=
+keyAlias=mygalia
+keyPassword=
