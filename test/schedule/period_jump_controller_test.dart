@@ -55,6 +55,7 @@ void main() {
   late ProviderContainer container;
 
   setUp(() {
+    PeriodJumpController.pauseBetweenFetches = Duration.zero;
     // Semaine 0 et 1 en entreprise, semaine 2 à l'école.
     repository = _FakeRepository({
       _w(0): _days(_w(0), 'Presence en entreprise'),
@@ -119,5 +120,69 @@ void main() {
 
     expect(result, isA<PeriodNotFound>());
     expect(container.read(scheduleSelectedDayProvider), before);
+  });
+
+  group('cache utilisable pour une recherche', () {
+    final DateTime monday = DateTime(2026, 10, 12);
+    WeekSchedule week() => WeekSchedule(monday: monday, courses: const <Course>[]);
+    _FakeRepository withCache(DateTime savedAt) => _FakeRepository(
+          const <DateTime, List<Course>>{},
+          cached: {monday: CachedValue<WeekSchedule>(week(), savedAt)},
+        );
+
+    test('semaine à venir : valable sept jours, pas davantage', () {
+      final DateTime savedAt = DateTime(2026, 10, 1, 9);
+
+      expect(
+        PeriodJumpController.usableCache(withCache(savedAt), monday, DateTime(2026, 10, 7)),
+        isNotNull,
+      );
+      expect(
+        PeriodJumpController.usableCache(withCache(savedAt), monday, DateTime(2026, 10, 9)),
+        isNull,
+      );
+    });
+
+    test('semaine enregistrée après sa fin : figée, jamais redemandée', () {
+      final _FakeRepository repository = withCache(DateTime(2026, 10, 17, 8));
+
+      expect(
+        PeriodJumpController.usableCache(repository, monday, DateTime(2027, 6, 1)),
+        isNotNull,
+      );
+    });
+
+    test('semaine enregistrée en cours de route : redemandée une fois ancienne', () {
+      final _FakeRepository repository = withCache(DateTime(2026, 10, 14, 8));
+
+      expect(
+        PeriodJumpController.usableCache(repository, monday, DateTime(2026, 11, 1)),
+        isNull,
+      );
+    });
+
+    test('pas de cache : rien', () {
+      expect(
+        PeriodJumpController.usableCache(
+          _FakeRepository(const <DateTime, List<Course>>{}),
+          monday,
+          DateTime(2026, 10, 12),
+        ),
+        isNull,
+      );
+    });
+  });
+
+  test('pause entre deux semaines demandées, jamais avant la première', () async {
+    PeriodJumpController.pauseBetweenFetches = const Duration(milliseconds: 120);
+    final Stopwatch watch = Stopwatch()..start();
+
+    await container
+        .read(periodJumpControllerProvider.notifier)
+        .jump(from: _w(0), direction: PeriodJumpDirection.next);
+
+    // Trois semaines demandées : deux pauses.
+    expect(repository.fetches, 3);
+    expect(watch.elapsedMilliseconds, greaterThanOrEqualTo(240));
   });
 }

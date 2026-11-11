@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mygalia/core/debug/app_log.dart';
@@ -44,12 +45,23 @@ final periodJumpControllerProvider =
 
 /// Saut « de période de cours en période de cours » dans l'emploi du temps.
 ///
-/// Respect du serveur : une semaine déjà en cache depuis moins de
-/// [cacheValidity] n'est pas redemandée, les semaines sont chargées une à
-/// une, et la recherche s'arrête à 12 semaines. Un nouvel appui pendant la
-/// recherche l'annule.
+/// Respect du serveur (une semaine coûte cinq requêtes) :
+///  * une semaine passée déjà en cache n'est jamais redemandée : elle ne
+///    changera plus ;
+///  * une semaine à venir en cache depuis moins de [cacheValidity] non plus :
+///    la recherche ne veut savoir que « cours ou entreprise », et le rythme
+///    de l'alternance ne bouge pas d'un jour à l'autre. La semaine trouvée
+///    est de toute façon rafraîchie par l'écran qui l'affiche ;
+///  * les semaines manquantes sont chargées une à une, avec une pause de
+///    [pauseBetweenFetches] entre deux, et la recherche s'arrête à 12
+///    semaines.
+/// Un nouvel appui pendant la recherche l'annule.
 class PeriodJumpController extends Notifier<PeriodJumpDirection?> {
-  static const Duration cacheValidity = Duration(hours: 12);
+  static const Duration cacheValidity = Duration(days: 7);
+
+  /// Pause entre deux semaines demandées au serveur pendant une recherche.
+  @visibleForTesting
+  static Duration pauseBetweenFetches = const Duration(milliseconds: 400);
 
   CancelToken? _token;
 
@@ -95,8 +107,17 @@ class PeriodJumpController extends Notifier<PeriodJumpDirection?> {
     AppLog.lifecycle(label);
     try {
       final ScheduleRepository repository = ref.read(scheduleRepositoryProvider);
-      final CoursePeriodFinder finder =
-          CoursePeriodFinder((DateTime monday) => _loadWeek(repository, monday, token));
+      int fetched = 0;
+      final CoursePeriodFinder finder = CoursePeriodFinder((DateTime monday) async {
+        final WeekSchedule? cached = usableCache(repository, monday, DateTime.now());
+        if (token.isCancelled) throw const CancelledFailure();
+        if (cached != null) return cached;
+        if (fetched++ > 0) {
+          await Future<void>.delayed(pauseBetweenFetches);
+          if (token.isCancelled) throw const CancelledFailure();
+        }
+        return (await repository.fetchWeek(monday, cancelToken: token)).data;
+      });
       final DateTime? day = await search(finder);
       if (token.isCancelled) return const PeriodJumpCancelled();
       if (day == null) return const PeriodNotFound();
@@ -120,16 +141,18 @@ class PeriodJumpController extends Notifier<PeriodJumpDirection?> {
     state = null;
   }
 
-  static Future<WeekSchedule> _loadWeek(
+  /// Semaine en cache suffisante pour une recherche, ou `null`.
+  @visibleForTesting
+  static WeekSchedule? usableCache(
     ScheduleRepository repository,
     DateTime monday,
-    CancelToken token,
-  ) async {
-    if (token.isCancelled) throw const CancelledFailure();
+    DateTime now,
+  ) {
     final CachedValue<WeekSchedule>? cached = repository.cachedWeek(monday);
-    if (cached != null && DateTime.now().difference(cached.savedAt) < cacheValidity) {
-      return cached.data;
-    }
-    return (await repository.fetchWeek(monday, cancelToken: token)).data;
+    if (cached == null) return null;
+    // Semaine entièrement passée au moment de l'enregistrement : figée.
+    final DateTime saturday = DateTime(monday.year, monday.month, monday.day + 5);
+    if (!cached.savedAt.isBefore(saturday)) return cached.data;
+    return now.difference(cached.savedAt) < cacheValidity ? cached.data : null;
   }
 }
