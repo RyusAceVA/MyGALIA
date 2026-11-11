@@ -36,5 +36,9 @@ abstract final class AppConstants {
 
   /// Noms des boîtes Hive utilisées pour le cache local.
   static const String settingsBox = 'settings_box';
-  static const String cacheBox = 'cache_box';
+
+  /// Cache chiffré (AES, clé dans le coffre). [legacyCacheBox] est l'ancienne
+  /// boîte en clair, supprimée au démarrage.
+  static const String cacheBox = 'cache_box_v2';
+  static const String legacyCacheBox = 'cache_box';
 }

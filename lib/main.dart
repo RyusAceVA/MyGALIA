@@ -5,12 +5,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mygalia/app.dart';
 import 'package:mygalia/core/constants/app_constants.dart';
 import 'package:mygalia/core/debug/app_log.dart';
+import 'package:mygalia/core/storage/cache_box.dart';
+import 'package:mygalia/core/storage/secure_storage_service.dart';
 
 /// Point d'entrée de MyGalia.
 ///
 /// Ordre d'initialisation :
 ///   1. Binding Flutter (obligatoire avant tout appel asynchrone au démarrage).
-///   2. Hive (cache local) + ouverture des boîtes de base.
+///   2. Hive : préférences, puis cache local chiffré.
 ///   3. Montage de l'arbre sous [ProviderScope] — racine de Riverpod : tous les
 ///      providers de l'app y vivent.
 Future<void> main() async {
@@ -20,7 +22,12 @@ Future<void> main() async {
   // --- Stockage local (Hive) ---------------------------------------------
   await Hive.initFlutter();
   await _openBox(AppConstants.settingsBox);
-  await _openBox(AppConstants.cacheBox);
+  // Planning et notes : boîte chiffrée, clé dans le coffre.
+  await deleteLegacyCache();
+  await openEncryptedBox(
+    AppConstants.cacheBox,
+    SecureStorageService(const FlutterSecureKeyValueStore()),
+  );
 
   // ProviderScope : conteneur racine de Riverpod. Indispensable pour que
   // n'importe quel widget descendant puisse lire/observer des providers.

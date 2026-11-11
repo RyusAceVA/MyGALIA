@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -106,6 +107,7 @@ class SecureStorageService {
   static const String _kCredentials = 'mygalia.credentials';
   static const String _kApiToken = 'mygalia.api_token';
   static const String _kEdcSession = 'mygalia.edc_session';
+  static const String _kCacheKey = 'mygalia.cache_key';
 
   Future<Credentials?> readCredentials() async {
     final Map<String, Object?>? json = await _readJson(_kCredentials);
@@ -146,16 +148,36 @@ class SecureStorageService {
 
   Future<void> deleteEdcSession() => _delete(_kEdcSession);
 
-  /// Purge complète (déconnexion, identifiants refusés).
+  /// Purge des secrets de connexion (déconnexion, identifiants refusés).
+  /// La clé du cache local est conservée : elle ne protège que des données
+  /// déjà effacées à la déconnexion, et la boîte ouverte en dépend.
   Future<void> clearAll() async {
+    await _delete(_kCredentials);
+    await _delete(_kApiToken);
+    await _delete(_kEdcSession);
+  }
+
+  /// Clé AES-256 du cache local (planning, notes), créée au premier appel.
+  /// `null` si le coffre est indisponible : l'appelant ne doit alors rien
+  /// conserver sur le disque.
+  Future<List<int>?> cacheKey({Random? random}) async {
     try {
-      await _store.deleteAll();
+      final String? stored = await _store.read(_kCacheKey);
+      if (stored != null) {
+        try {
+          final List<int> key = base64Decode(stored);
+          if (key.length == 32) return key;
+        } on FormatException {
+          // Clé corrompue : remplacée ci-dessous.
+        }
+      }
+      final Random source = random ?? Random.secure();
+      final List<int> key = List<int>.generate(32, (_) => source.nextInt(256));
+      await _store.write(_kCacheKey, base64Encode(key));
+      return key;
     } on Object catch (e) {
-      // Repli : suppression clé par clé.
-      AppLog.error('coffre : purge globale impossible (${e.runtimeType})');
-      await _delete(_kCredentials);
-      await _delete(_kApiToken);
-      await _delete(_kEdcSession);
+      AppLog.error('coffre : clé du cache indisponible (${e.runtimeType})');
+      return null;
     }
   }
 
