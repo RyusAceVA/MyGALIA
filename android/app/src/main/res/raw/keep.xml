@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ressources à conserver en release. L'icône des notifications n'est
+     citée que par son nom, depuis le code Dart : sans cette ligne,
+     l'optimiseur de ressources la juge inutilisée et la supprime, et plus
+     aucune notification ne peut être initialisée ni affichée. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_mygalia" />
