@@ -44,6 +44,19 @@ Les captures suivent le thème de votre GitHub : clair ou sombre.
 | :---: | :---: | :---: | :---: |
 | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_home.png"><img src=".github/assets/capture_clair_home.png" alt="Écran d'accueil" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_planning.png"><img src=".github/assets/capture_clair_planning.png" alt="Écran de l'emploi du temps" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_notes.png"><img src=".github/assets/capture_clair_notes.png" alt="Écran des notes" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_settings.png"><img src=".github/assets/capture_clair_settings.png" alt="Écran des paramètres" width="100%"></picture> |
 
+### Couleurs du fond d'écran
+
+Sur Android 12 et plus récent, MyGalia reprend la couleur que le système tire
+de votre fond d'écran (Material You). Changez de fond : l'app change de teinte
+à votre retour, en clair comme en sombre.
+
+| En mouvement | Indigo (par défaut) | Fond terracotta | Fond vert |
+| :---: | :---: | :---: | :---: |
+| <img src=".github/assets/demo_couleurs.gif" alt="L'accueil passe de l'indigo au terracotta puis au vert" width="100%"> | <img src=".github/assets/palette_indigo.png" alt="Accueil en indigo" width="100%"> | <img src=".github/assets/palette_terracotta.png" alt="Accueil en terracotta" width="100%"> | <img src=".github/assets/palette_vert.png" alt="Accueil en vert" width="100%"> |
+
+Même écran, trois fonds d'écran. L'animation enchaîne ces trois captures.
+L'indigo reste la couleur de l'app avant Android 12.
+
 ### Clair et sombre
 
 | Clair | Sombre |
@@ -65,6 +78,8 @@ y sont remplacés par des valeurs fictives.
   20 ; absences et dispenses sont affichées sans compter dans la moyenne.
 - **Notifications** (à activer dans Paramètres) : nouvelle note publiée, et
   rappel le vendredi quand la semaine suivante comporte des cours à l'école.
+- **Couleurs dynamiques** : la teinte de l'app suit votre fond d'écran
+  (Android 12+), en thème clair, sombre ou automatique.
 - **Hors ligne** : les dernières données valides restent consultables.
 
 ## Confidentialité et sécurité
