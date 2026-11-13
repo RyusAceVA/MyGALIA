@@ -12,7 +12,8 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   AppColors._();
 
-  /// Couleur graine : indigo moderne. Toute l'harmonie M3 en découle.
+  /// Couleur graine par défaut : indigo moderne. Toute l'harmonie M3 en
+  /// découle quand le système ne fournit pas de couleur (avant Android 12).
   static const Color seed = Color(0xFF6366F1);
 
   /// Accent secondaire discret (violet) pour les états sélectionnés.
@@ -34,9 +35,10 @@ abstract final class AppColors {
   // ColorSchemes
   // -------------------------------------------------------------------------
 
-  /// Schéma clair : neutres papier + accent indigo.
-  static ColorScheme get light => ColorScheme.fromSeed(
-        seedColor: seed,
+  /// Schéma clair : neutres papier + accent tiré de [accentSeed] (la
+  /// couleur du fond d'écran sur Android 12+), indigo à défaut.
+  static ColorScheme light([Color? accentSeed]) => ColorScheme.fromSeed(
+        seedColor: accentSeed ?? seed,
         brightness: Brightness.light,
         error: danger,
       ).copyWith(
@@ -45,8 +47,8 @@ abstract final class AppColors {
       );
 
   /// Schéma sombre : fonds « encre » pour un rendu plus profond que le défaut.
-  static ColorScheme get dark => ColorScheme.fromSeed(
-        seedColor: seed,
+  static ColorScheme dark([Color? accentSeed]) => ColorScheme.fromSeed(
+        seedColor: accentSeed ?? seed,
         brightness: Brightness.dark,
         error: danger,
       ).copyWith(

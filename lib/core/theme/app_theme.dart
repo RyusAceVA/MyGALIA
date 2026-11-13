@@ -21,8 +21,9 @@ abstract final class AppTheme {
   static const String bodyFont = 'Inter';
   static const String titleFont = 'SpaceGrotesk';
 
-  static ThemeData get light => _build(AppColors.light);
-  static ThemeData get dark => _build(AppColors.dark);
+  /// [accentSeed] : couleur d'accent du système (fond d'écran), si connue.
+  static ThemeData light([Color? accentSeed]) => _build(AppColors.light(accentSeed));
+  static ThemeData dark([Color? accentSeed]) => _build(AppColors.dark(accentSeed));
 
   // -------------------------------------------------------------------------
   // Construction commune : on dérive tout le thème du ColorScheme fourni,
