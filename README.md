@@ -1,11 +1,59 @@
-# MyGalia
+<p align="center">
+  <img src=".github/assets/banner.png" alt="MyGalia : emploi du temps et notes SC Form dans une app Android" width="100%">
+</p>
 
-Client Android **non officiel** de l'espace élève SC Form / GaliaEDC : emploi
-du temps, notes, et un accueil qui résume la journée. Interface Material 3
-Expressive, écrite en Flutter.
+<h3 align="center">Client Android non officiel de l'espace élève SC Form / GaliaEDC</h3>
 
-MyGalia n'est ni édité ni approuvé par SC Form. L'app lit les mêmes pages que
-le site officiel, avec vos identifiants, et ne les envoie nulle part ailleurs.
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white" alt="Flutter 3.44">
+  <img src="https://img.shields.io/badge/Android-7%2B-3DDC84?logo=android&logoColor=white" alt="Android 7 et plus">
+  <img src="https://img.shields.io/badge/Material%203-Expressive-6366F1" alt="Material 3 Expressive">
+  <img src="https://img.shields.io/badge/version-1.0.0-8B5CF6" alt="Version 1.0.0">
+</p>
+
+<p align="center">
+  <a href="#aperçu">Aperçu</a> •
+  <a href="#fonctions">Fonctions</a> •
+  <a href="#confidentialité-et-sécurité">Confidentialité</a> •
+  <a href="#développement">Développement</a> •
+  <a href="#publier-une-version">Publication</a>
+</p>
+
+---
+
+Emploi du temps, notes, et un accueil qui résume la journée. Interface
+Material 3 Expressive, écrite en Flutter.
+
+> [!IMPORTANT]
+> MyGalia n'est ni édité ni approuvé par SC Form. L'app lit les mêmes pages
+> que le site officiel, avec vos identifiants, et ne les envoie nulle part
+> ailleurs.
+
+## Aperçu
+
+| Accueil | Emploi du temps | Notes | Thème |
+| :---: | :---: | :---: | :---: |
+| <img src=".github/assets/demo_home.gif" alt="Actualisation de l'accueil avec l'indicateur à forme changeante" width="100%"> | <img src=".github/assets/demo_planning.gif" alt="Navigation de semaine en semaine dans l'emploi du temps" width="100%"> | <img src=".github/assets/demo_notes.gif" alt="Défilement des notes et changement de semestre" width="100%"> | <img src=".github/assets/demo_theme.gif" alt="Bascule entre thème clair et thème sombre" width="100%"> |
+| Le cours en cours et sa progression | Semaine par semaine, jour par jour | Cursus, semestres et moyenne | Clair, sombre ou automatique |
+
+### Les quatre écrans
+
+Les captures suivent le thème de votre GitHub : clair ou sombre.
+
+| Accueil | Emploi du temps | Notes | Paramètres |
+| :---: | :---: | :---: | :---: |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_home.png"><img src=".github/assets/capture_clair_home.png" alt="Écran d'accueil" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_planning.png"><img src=".github/assets/capture_clair_planning.png" alt="Écran de l'emploi du temps" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_notes.png"><img src=".github/assets/capture_clair_notes.png" alt="Écran des notes" width="100%"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/capture_sombre_settings.png"><img src=".github/assets/capture_clair_settings.png" alt="Écran des paramètres" width="100%"></picture> |
+
+### Clair et sombre
+
+| Clair | Sombre |
+| :---: | :---: |
+| <img src=".github/assets/capture_clair_notes.png" alt="Écran des notes en thème clair" width="320"> | <img src=".github/assets/capture_sombre_notes.png" alt="Écran des notes en thème sombre" width="320"> |
+
+Captures prises sur un Pixel 9 Pro. L'adresse e-mail et le nom des formateurs
+y sont remplacés par des valeurs fictives.
+
+---
 
 ## Fonctions
 
